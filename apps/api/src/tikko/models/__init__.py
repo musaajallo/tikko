@@ -2,5 +2,6 @@
 
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
+from tikko.models.user import User
 
-__all__ = ["AttendanceLog", "Device"]
+__all__ = ["AttendanceLog", "Device", "User"]

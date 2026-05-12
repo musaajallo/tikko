@@ -9,7 +9,8 @@ from fastapi import FastAPI
 
 from tikko import __version__
 from tikko.db import Base, get_engine
-from tikko.models import Device  # noqa: F401 — imported for metadata registration
+from tikko.models import AttendanceLog, Device, User  # noqa: F401 — register metadata
+from tikko.routes.auth import router as auth_router
 from tikko.routes.devices import router as devices_router
 
 
@@ -30,4 +31,5 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "tikko-api", "version": __version__}
 
 
+app.include_router(auth_router)
 app.include_router(devices_router)

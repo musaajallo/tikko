@@ -102,6 +102,18 @@
   - Removed the `as never` cast from F10's Link now that the route exists.
 - **Walking skeleton is now complete** — device register → poll → view attendance works end-to-end through web + api with mocked pyzk in tests.
 
+## F12 — Auth: register + login + JWT ✓
+- **Tests:** 23/23 (8 new auth tests), ruff clean
+- **Files:** src/tikko/auth/{__init__,hashing,tokens}.py, src/tikko/models/user.py, src/tikko/schemas/user.py, src/tikko/routes/auth.py
+- **Deps added:** bcrypt 5.0, pyjwt 2.12
+- **Routes:** POST /auth/register (201, returns UserRead without password), POST /auth/login (200, returns access+refresh tokens), 409 on duplicate email, 401 on wrong password / unknown email (same message — no enumeration)
+- **JWT claims:** sub (user id), role, type ("access"|"refresh"), iat, exp. HS256 signed with `TIKKO_JWT_SECRET`. TTLs from settings (default 15min access / 30 days refresh).
+- **Notes:**
+  - Password min length enforced at 10 chars in `UserCreate`; pydantic returns 422 on shorter
+  - Role defaults to "employee"; `UserRole` is a `Literal` constrained to admin/manager/employee
+  - InsecureKeyLengthWarning during tests because default `TIKKO_JWT_SECRET` is "change-me" — set a real secret in prod (`openssl rand -hex 32`)
+
+
 
 
 
