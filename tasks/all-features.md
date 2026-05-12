@@ -34,7 +34,7 @@
 - [x] F08 — pyzk wrapper + `POST /devices/:id/test-connection` (mocked unit tests, real-device manual test)
 - [x] F09 — AttendanceLog model + `POST /devices/:id/poll` (pulls via pyzk, dedups) + `GET /devices/:id/attendance`
 - [x] F10 — Web `/devices` page (list + add form + test-connection button)
-- [ ] F11 — Web `/devices/:id/attendance` page (paginated list, manual poll button)
+- [x] F11 — Web `/devices/:id/attendance` page (paginated list, manual poll button)
 
 ### Auth
 

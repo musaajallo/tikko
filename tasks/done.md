@@ -93,6 +93,16 @@
   - Hit React 19 types-collision bug on layout.tsx (two @types/react copies — one from web's direct dep, one transitive through next-dom). Pragmatic patch: `{children as any}` cast in app/layout.tsx. Real fix is a `pnpm.overrides` to pin @types/react across the workspace; deferred because mobile uses React 18 and unified pinning needs more care.
   - Typed routes Link href cast `as never` for `/devices/[id]/attendance` since that route doesn't exist yet — will tighten in F11.
 
+## F11 — Web attendance page ✓
+- **Tests:** 6/6 web vitest (2 home + 2 devices + 2 attendance), typecheck + lint clean
+- **Files:** app/devices/[id]/attendance/page.tsx (server component awaiting params), app/devices/[id]/attendance/AttendanceClient.tsx (client component), app/devices/[id]/attendance/__tests__/attendance.test.tsx
+- **Notes:**
+  - Page splits server (awaits Next 15 async params) + client (state + fetch). Tests run against the client component directly.
+  - 'Poll now' button calls F09's POST /devices/:id/poll then refetches the list. Reports `{ polled, new }` count to the user.
+  - Removed the `as never` cast from F10's Link now that the route exists.
+- **Walking skeleton is now complete** — device register → poll → view attendance works end-to-end through web + api with mocked pyzk in tests.
+
+
 
 
 

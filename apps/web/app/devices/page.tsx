@@ -131,7 +131,7 @@ export default function DevicesPage() {
                 >
                   {testingId === d.id ? "Testing…" : "Test connection"}
                 </button>
-                <Link href={`/devices/${d.id}/attendance` as never}>
+                <Link href={`/devices/${d.id}/attendance`}>
                   View attendance →
                 </Link>
               </div>
