@@ -52,3 +52,21 @@ def client() -> Iterator[TestClient]:
     finally:
         app.dependency_overrides.clear()
         db_module.reset_engine()
+
+
+@pytest.fixture
+def admin_auth(client: TestClient) -> dict[str, str]:
+    """Register a fresh admin user and return an `Authorization: Bearer …` header dict."""
+    client.post(
+        "/auth/register",
+        json={
+            "email": "admin-fixture@example.com",
+            "password": "supersecret123",
+            "role": "admin",
+        },
+    )
+    token = client.post(
+        "/auth/login",
+        json={"email": "admin-fixture@example.com", "password": "supersecret123"},
+    ).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

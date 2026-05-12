@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tikko.auth import get_current_user, require_role
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
@@ -19,6 +20,11 @@ from tikko.settings import get_settings
 from tikko.zk.client import RawPunch, ZKClient, ZKConnectionError
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+
+# Common guards reused below.
+_admin_only = Depends(require_role("admin"))
+_admin_or_manager = Depends(require_role("admin", "manager"))
+_authenticated = Depends(get_current_user)
 
 
 async def _insert_punches_dedup(
@@ -53,7 +59,12 @@ async def _insert_punches_dedup(
     return result.rowcount or 0
 
 
-@router.post("", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DeviceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[_admin_only],
+)
 async def create_device(payload: DeviceCreate, session: SessionDep) -> Device:
     device = Device(
         name=payload.name,
@@ -66,7 +77,7 @@ async def create_device(payload: DeviceCreate, session: SessionDep) -> Device:
     return device
 
 
-@router.get("", response_model=DeviceList)
+@router.get("", response_model=DeviceList, dependencies=[_admin_or_manager])
 async def list_devices(session: SessionDep) -> DeviceList:
     result = await session.execute(select(Device).order_by(Device.created_at))
     items = result.scalars().all()
@@ -77,7 +88,9 @@ async def list_devices(session: SessionDep) -> DeviceList:
     )
 
 
-@router.get("/{device_id}", response_model=DeviceRead)
+@router.get(
+    "/{device_id}", response_model=DeviceRead, dependencies=[_admin_or_manager]
+)
 async def get_device(device_id: str, session: SessionDep) -> Device:
     device = await session.get(Device, device_id)
     if device is None:
@@ -85,7 +98,11 @@ async def get_device(device_id: str, session: SessionDep) -> Device:
     return device
 
 
-@router.post("/{device_id}/test-connection", response_model=DeviceInfoRead)
+@router.post(
+    "/{device_id}/test-connection",
+    response_model=DeviceInfoRead,
+    dependencies=[_admin_only],
+)
 async def test_device_connection(device_id: str, session: SessionDep) -> DeviceInfoRead:
     device = await session.get(Device, device_id)
     if device is None:
@@ -114,7 +131,11 @@ async def test_device_connection(device_id: str, session: SessionDep) -> DeviceI
     )
 
 
-@router.post("/{device_id}/poll", response_model=PollResult)
+@router.post(
+    "/{device_id}/poll",
+    response_model=PollResult,
+    dependencies=[_admin_or_manager],
+)
 async def poll_device(device_id: str, session: SessionDep) -> PollResult:
     device = await session.get(Device, device_id)
     if device is None:
@@ -139,7 +160,11 @@ async def poll_device(device_id: str, session: SessionDep) -> PollResult:
     return PollResult(polled=len(punches), new=new_count)
 
 
-@router.get("/{device_id}/attendance", response_model=AttendanceLogList)
+@router.get(
+    "/{device_id}/attendance",
+    response_model=AttendanceLogList,
+    dependencies=[_authenticated],
+)
 async def list_attendance(
     device_id: str,
     session: SessionDep,

@@ -113,6 +113,18 @@
   - Role defaults to "employee"; `UserRole` is a `Literal` constrained to admin/manager/employee
   - InsecureKeyLengthWarning during tests because default `TIKKO_JWT_SECRET` is "change-me" — set a real secret in prod (`openssl rand -hex 32`)
 
+## F13 — Auth middleware + role guards ✓
+- **Tests:** 31/31 (8 new auth-guard tests, 15 existing tests updated to authenticate), ruff clean
+- **Files:** src/tikko/auth/dependencies.py (CurrentUser dataclass, get_current_user, require_role), guards applied to 5 /devices routes, tests/conftest.py grew `admin_auth` fixture, 3 existing test files updated to pass the fixture
+- **Route policy:**
+  - `POST /devices`, `POST /devices/:id/test-connection` — admin only
+  - `GET /devices`, `GET /devices/:id`, `POST /devices/:id/poll` — admin or manager
+  - `GET /devices/:id/attendance` — any authenticated role
+  - `/health`, `/auth/register`, `/auth/login` — public
+- **Errors:** 401 (missing/bad/expired token) with `WWW-Authenticate: Bearer`; 403 (wrong role) with `role 'X' not allowed`
+- **Retrospective:** Splitting auth into F12 (endpoints) and F13 (apply guards) caused churn — 15 existing tests had to be updated. Should have either bundled them or built auth into F07 from day one. Carry this lesson into F14+ planning: when a feature horizontally affects all existing endpoints/screens, scope it as one feature.
+
+
 
 
 
