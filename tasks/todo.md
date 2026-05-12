@@ -1,20 +1,20 @@
 # TODO
 
-## F04 — Web skeleton (next)
+## F05 — Mobile skeleton (next)
 
 Steps:
-1. `cd apps/web` and scaffold Next.js App Router + TS manually (avoid `create-next-app` interactive prompts)
-2. Add deps: next, react, react-dom, typescript, vitest, @vitejs/plugin-react, jsdom, @testing-library/react
-3. Layout: `app/layout.tsx`, `app/page.tsx`, basic `app/health/page.tsx` or component test
-4. tsconfig + next-env.d.ts + eslint config
-5. **Write failing test first** — `app/__tests__/home.test.tsx` asserts the home page renders with a heading
-6. Implement minimal `app/page.tsx` to pass
-7. Add `package.json` scripts: `dev`, `build`, `start`, `lint`, `typecheck`, `test`
+1. `cd apps/mobile` and write Expo TS scaffold manually (avoid `create-expo-app` prompts)
+2. Add deps: expo, react, react-native, expo-router (for file-based routing matching web), typescript, jest, @testing-library/react-native, jest-expo
+3. Layout: `app/_layout.tsx`, `app/index.tsx`, basic Expo Router setup
+4. **Write failing test first** — `app/__tests__/index.test.tsx` asserts the home screen renders heading
+5. Implement minimal `app/index.tsx`
+6. Configure jest with `jest-expo` preset
+7. Add `package.json` scripts: `start`, `android`, `ios`, `web`, `lint`, `typecheck`, `test`
 
 ## Up next
 
-- F05 — Mobile skeleton
 - F06 — Shared packages
+- F07 — Device model + register
 
 ## Blocked
 

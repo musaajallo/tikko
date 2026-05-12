@@ -24,7 +24,7 @@
 - [x] F01 — Monorepo skeleton (pnpm workspaces, turbo, root scripts, .gitignore, .env.example, README, CLAUDE.md, git init)
 - [x] F02 — CI workflow (GitHub Actions: lint + test + typecheck for api/web/mobile)
 - [x] F03 — API skeleton (FastAPI + uv + pytest + `/health`, settings module reading `TIKKO_*`, ruff)
-- [ ] F04 — Web skeleton (Next.js + vitest + smoke test, eslint, tsconfig, base layout)
+- [x] F04 — Web skeleton (Next.js + vitest + smoke test, eslint, tsconfig, base layout)
 - [ ] F05 — Mobile skeleton (Expo TS + jest + smoke test, eslint, tsconfig, base navigation)
 - [ ] F06 — Shared packages (`@tikko/shared-types` with Zod, `@tikko/api-client` with OpenAPI codegen pipeline)
 

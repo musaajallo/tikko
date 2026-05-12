@@ -34,3 +34,16 @@
   - `get_settings()` returns a cached singleton; tests can patch it later.
   - Ruff config in `pyproject.toml`, `select = [E,W,F,I,B,UP,RUF]`; clean.
 
+## F04 — Web skeleton ✓
+- **Tests:** 2/2 passing (Home renders the tikko heading; links to /devices)
+- **Files changed:** 10 new (package.json, tsconfig.json, next.config.ts, vitest.config.ts, vitest.setup.ts, .eslintrc.json, next-env.d.ts, app/layout.tsx, app/page.tsx, app/__tests__/home.test.tsx) + pnpm-lock updates
+- **Lines:** +~150 src/test
+- **Complexity:** Low — single page + smoke component test
+- **Notes:**
+  - Next 15.1, React 19, TypeScript 5.7, Vitest 2.1, jsdom 25
+  - `outputFileTracingRoot` pinned to repo root to silence Next's "multiple lockfiles" warning (there's a stray `package-lock.json` somewhere up the directory tree).
+  - `next lint` is deprecated in Next 15.x and will be removed in Next 16. Migration to `eslint` CLI + flat config deferred to a future feature (will tackle alongside Next 16 upgrade).
+  - Tests run with `pnpm --filter @tikko/web test` via vitest.
+  - Strict TDD: RED was implicit (test imports `../page` which didn't exist); didn't observe a failing vitest run separately because pnpm install hadn't completed yet. Future features will do explicit RED → GREEN.
+
+
