@@ -50,6 +50,12 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# Local dev database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
 # Misc
 *.swp
 *.swo
