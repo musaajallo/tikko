@@ -43,7 +43,16 @@ cp .env.example .env
 pnpm install
 cd apps/api && uv sync && cd ../..
 
-pnpm dev
+pnpm dev          # runs api (:8000) + web (:3000) together
+pnpm dev:mobile   # mobile in a separate terminal (Expo is interactive)
+```
+
+Other scripts:
+
+```bash
+pnpm dev:api      # api only
+pnpm dev:web      # web only
+pnpm test         # api pytest + web/mobile/packages vitest+jest
 ```
 
 ## Deployment modes

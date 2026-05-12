@@ -8,7 +8,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "cd apps/api && uv run fastapi dev src/tikko/main.py",
+    "dev:web": "pnpm --filter @tikko/web dev",
+    "dev:mobile": "pnpm --filter @tikko/mobile start",
+    "dev:turbo": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -17,6 +21,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\""
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "prettier": "^3.3.3",
     "turbo": "^2.3.3"
   }
