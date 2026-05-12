@@ -6,12 +6,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from tikko import __version__
 from tikko.db import Base, get_engine
 from tikko.models import AttendanceLog, Device, User  # noqa: F401 — register metadata
 from tikko.routes.auth import router as auth_router
 from tikko.routes.devices import router as devices_router
+from tikko.settings import get_settings
 
 
 @asynccontextmanager
@@ -24,6 +26,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="tikko-api", version=__version__, lifespan=lifespan)
+
+_settings = get_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")

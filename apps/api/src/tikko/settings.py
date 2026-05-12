@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +43,19 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     log_level: str = "info"
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_csv_origins(cls, value: object) -> object:
+        """Accept either a JSON array or a plain comma-separated string from env."""
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return []
+            if value.startswith("["):
+                return value  # leave for pydantic's JSON parser
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
 
 _settings: Settings | None = None
