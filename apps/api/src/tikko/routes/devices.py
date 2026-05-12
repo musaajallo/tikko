@@ -71,6 +71,7 @@ async def create_device(payload: DeviceCreate, session: SessionDep) -> Device:
         host=payload.host,
         port=payload.port,
         location=payload.location,
+        serial_number=payload.serial_number,
     )
     session.add(device)
     await session.flush()

@@ -13,6 +13,7 @@ from tikko.db import Base, get_engine
 from tikko.models import AttendanceLog, Device, User  # noqa: F401 — register metadata
 from tikko.routes.auth import router as auth_router
 from tikko.routes.devices import router as devices_router
+from tikko.routes.iclock import router as iclock_router
 from tikko.settings import get_settings
 
 
@@ -44,3 +45,4 @@ def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(devices_router)
+app.include_router(iclock_router)

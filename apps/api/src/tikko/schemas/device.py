@@ -12,6 +12,7 @@ class DeviceCreate(BaseModel):
     host: str = Field(..., min_length=1, max_length=255)
     port: int = Field(default=4370, ge=1, le=65535)
     location: str | None = Field(default=None, max_length=255)
+    serial_number: str | None = Field(default=None, max_length=64)
 
 
 class DeviceRead(BaseModel):
@@ -22,6 +23,7 @@ class DeviceRead(BaseModel):
     host: str
     port: int
     location: str | None
+    serial_number: str | None = None
     created_at: datetime
 
 

@@ -27,6 +27,11 @@ class Device(Base):
     host: Mapped[str] = mapped_column(String(255), nullable=False)
     port: Mapped[int] = mapped_column(Integer, nullable=False, default=4370)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Serial number reported by ADMS-push devices on first contact. Used to
+    # identify the device row when an unknown SN arrives.
+    serial_number: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

@@ -48,7 +48,7 @@
 
 ### Real-time + ADMS push protocol
 
-- [ ] F15 — ADMS push receiver (`POST /iclock/cdata`, `GET /iclock/getrequest`, device registration handshake)
+- [x] F15 — ADMS push receiver (`POST /iclock/cdata`, `GET /iclock/getrequest`, device registration handshake)
 - [ ] F16 — WebSocket real-time feed (`/ws/attendance`) broadcasting new punches
 - [ ] F17 — Mobile real-time feed UI (subscribe + show punches as they arrive)
 
