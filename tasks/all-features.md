@@ -30,7 +30,7 @@
 
 ### Walking skeleton: register device → poll → view
 
-- [ ] F07 — Device model + `POST /devices` + `GET /devices` (alembic migration, integration tests)
+- [x] F07 — Device model + `POST /devices` + `GET /devices` (alembic migration, integration tests)
 - [ ] F08 — pyzk wrapper + `POST /devices/:id/test-connection` (mocked unit tests, real-device manual test)
 - [ ] F09 — AttendanceLog model + `POST /devices/:id/poll` (pulls via pyzk, dedups) + `GET /devices/:id/attendance`
 - [ ] F10 — Web `/devices` page (list + add form + test-connection button)

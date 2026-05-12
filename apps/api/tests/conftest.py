@@ -1,14 +1,54 @@
-"""Shared pytest fixtures for the tikko-api test suite."""
+"""Shared pytest fixtures for the tikko-api test suite.
+
+Each test gets a fresh in-memory SQLite engine; the `get_session` dependency
+is overridden so the app reads from that engine instead of the configured
+production database.
+"""
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Iterator
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import tikko.db as db_module
+from tikko.db import get_session
 from tikko.main import app
+from tikko.models import Device  # noqa: F401 — register model with Base.metadata
 
 
 @pytest.fixture
-def client() -> TestClient:
-    """A synchronous TestClient bound to the FastAPI app."""
-    return TestClient(app)
+def client() -> Iterator[TestClient]:
+    """A TestClient backed by an isolated in-memory SQLite database."""
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+    )
+    test_sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+
+    # Point the module-level cache at the test engine so anything that calls
+    # get_engine()/get_sessionmaker() during the request lifecycle stays
+    # consistent with the override below.
+    db_module._engine = engine
+    db_module._sessionmaker = test_sessionmaker
+
+    async def override_get_session() -> AsyncIterator[AsyncSession]:
+        async with test_sessionmaker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    try:
+        # TestClient drives the lifespan, which creates tables on the test engine.
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
+        db_module.reset_engine()
