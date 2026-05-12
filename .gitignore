@@ -1,0 +1,55 @@
+# Node / pnpm
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+
+# Next.js
+.next/
+out/
+
+# Turbo
+.turbo/
+
+# Build outputs
+dist/
+build/
+
+# Python / uv
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Misc
+*.swp
+*.swo

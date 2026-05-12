@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "TIKKO_DEPLOY_MODE",
+    "TIKKO_API_BASE_URL",
+    "TIKKO_DATABASE_URL",
+    "TIKKO_JWT_SECRET",
+    "TIKKO_CORS_ORIGINS",
+    "TIKKO_LOG_LEVEL"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "build/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    }
+  }
+}
