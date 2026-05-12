@@ -25,7 +25,7 @@
 - [x] F02 — CI workflow (GitHub Actions: lint + test + typecheck for api/web/mobile)
 - [x] F03 — API skeleton (FastAPI + uv + pytest + `/health`, settings module reading `TIKKO_*`, ruff)
 - [x] F04 — Web skeleton (Next.js + vitest + smoke test, eslint, tsconfig, base layout)
-- [ ] F05 — Mobile skeleton (Expo TS + jest + smoke test, eslint, tsconfig, base navigation)
+- [x] F05 — Mobile skeleton (Expo TS + jest + smoke test, eslint, tsconfig, base navigation)
 - [ ] F06 — Shared packages (`@tikko/shared-types` with Zod, `@tikko/api-client` with OpenAPI codegen pipeline)
 
 ### Walking skeleton: register device → poll → view
