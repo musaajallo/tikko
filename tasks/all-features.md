@@ -19,6 +19,10 @@
 
 ## Features
 
+### UI Polish
+
+- [x] UI Polish — Tailwind v4 + shadcn/ui (Radix base) + emerald brand + app shell + sidebar nav + page rewrites for login, devices, attendance
+
 ### Bootstrap
 
 - [x] F01 — Monorepo skeleton (pnpm workspaces, turbo, root scripts, .gitignore, .env.example, README, CLAUDE.md, git init)

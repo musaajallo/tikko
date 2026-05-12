@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AttendanceClient from "../AttendanceClient";
 
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 describe("AttendanceClient", () => {
   const fetchMock = vi.fn();
   const deviceId = "device-1";
@@ -80,7 +84,6 @@ describe("AttendanceClient", () => {
 
     await waitFor(() => {
       expect(screen.getByText("1099")).toBeInTheDocument();
-      expect(screen.getByText(/2 new/i)).toBeInTheDocument();
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(3);

@@ -1,7 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import DevicesPage from "../page";
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 describe("Devices page", () => {
   const fetchMock = vi.fn();
@@ -15,7 +19,7 @@ describe("Devices page", () => {
     vi.unstubAllGlobals();
   });
 
-  it("lists devices fetched from the api", async () => {
+  it("renders devices fetched from the api in a table", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -41,9 +45,12 @@ describe("Devices page", () => {
     });
   });
 
-  it("submits a new device through the form", async () => {
-    // initial GET /devices
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ items: [], total: 0 }) });
+  it("opens the add-device dialog and posts a new device", async () => {
+    // initial GET /devices — empty
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ items: [], total: 0 }),
+    });
     // POST /devices
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -76,13 +83,20 @@ describe("Devices page", () => {
 
     render(<DevicesPage />);
 
-    await waitFor(() =>
-      expect(screen.getByPlaceholderText(/name/i)).toBeInTheDocument(),
-    );
+    // Wait for the empty state then click the header trigger (first of two
+    // "Add device" buttons; the second is the empty-state CTA).
+    await screen.findByText(/no devices yet/i);
+    const [triggerButton] = screen.getAllByRole("button", { name: /add device/i });
+    fireEvent.click(triggerButton);
 
-    fireEvent.change(screen.getByPlaceholderText(/name/i), { target: { value: "Lobby" } });
-    fireEvent.change(screen.getByPlaceholderText(/host/i), { target: { value: "10.0.0.5" } });
-    fireEvent.click(screen.getByRole("button", { name: /add device/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/name/i), {
+      target: { value: "Lobby" },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/host/i), {
+      target: { value: "10.0.0.5" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /add device/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Lobby")).toBeInTheDocument();

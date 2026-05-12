@@ -38,10 +38,10 @@ describe("Login page", () => {
 
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByPlaceholderText(/email/i), {
+    fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "admin@example.com" },
     });
-    fireEvent.change(screen.getByPlaceholderText(/password/i), {
+    fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "supersecret123" },
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
@@ -62,10 +62,10 @@ describe("Login page", () => {
 
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByPlaceholderText(/email/i), {
+    fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "wrong@example.com" },
     });
-    fireEvent.change(screen.getByPlaceholderText(/password/i), {
+    fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "nope" },
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));

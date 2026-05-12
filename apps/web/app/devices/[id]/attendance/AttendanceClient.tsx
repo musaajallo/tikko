@@ -1,24 +1,44 @@
 "use client";
 
+import { ArrowLeft, Clock, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { api, type AttendanceList, type PollResult } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { api, type AttendanceList } from "@/lib/api";
 
 export default function AttendanceClient({ deviceId }: { deviceId: string }) {
   const [list, setList] = useState<AttendanceList>({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
-  const [lastPoll, setLastPoll] = useState<PollResult | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const result = await api.listAttendance(deviceId);
       setList(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      toast.error("Failed to load attendance", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setLoading(false);
     }
@@ -30,71 +50,88 @@ export default function AttendanceClient({ deviceId }: { deviceId: string }) {
 
   const onPoll = async () => {
     setPolling(true);
-    setError(null);
     try {
       const result = await api.pollDevice(deviceId);
-      setLastPoll(result);
+      toast.success("Device polled", {
+        description: `${result.polled} record${result.polled === 1 ? "" : "s"}, ${result.new} new`,
+      });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      toast.error("Poll failed", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setPolling(false);
     }
   };
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <h1>Attendance</h1>
-        <button type="button" onClick={onPoll} disabled={polling}>
-          {polling ? "Polling…" : "Poll now"}
-        </button>
-      </header>
+    <div className="space-y-4">
+      <Link
+        href="/devices"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" /> All devices
+      </Link>
 
-      {lastPoll && (
-        <p style={styles.info}>
-          Polled {lastPoll.polled} record{lastPoll.polled === 1 ? "" : "s"}, {lastPoll.new} new
-        </p>
-      )}
-
-      {error && <p style={styles.error}>{error}</p>}
-
-      {loading ? (
-        <p>Loading…</p>
-      ) : list.items.length === 0 ? (
-        <p>No attendance records yet. Click &ldquo;Poll now&rdquo; to pull from the device.</p>
-      ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Device user</th>
-              <th style={styles.th}>Punched at (UTC)</th>
-              <th style={styles.th}>Type</th>
-              <th style={styles.th}>Verify mode</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.items.map((item) => (
-              <tr key={item.id}>
-                <td style={styles.td}>{item.device_user_id}</td>
-                <td style={styles.td}>{item.punched_at}</td>
-                <td style={styles.td}>{item.punch_type}</td>
-                <td style={styles.td}>{item.verify_mode}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </main>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Attendance</CardTitle>
+            <CardDescription>Punches pulled from this terminal.</CardDescription>
+          </div>
+          <Button onClick={onPoll} disabled={polling}>
+            <RefreshCw className={`mr-1 h-4 w-4 ${polling ? "animate-spin" : ""}`} />
+            {polling ? "Polling…" : "Poll now"}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : list.items.length === 0 ? (
+            <div className="grid place-items-center gap-2 py-12 text-center">
+              <Clock className="h-10 w-10 text-muted-foreground" />
+              <h3 className="text-base font-semibold">No attendance records yet</h3>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                Click <strong>Poll now</strong> to pull punches buffered on the device.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Device user</TableHead>
+                  <TableHead>Punched at (UTC)</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Verify mode</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">
+                      {item.device_user_id}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {item.punched_at}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.punch_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.verify_mode}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { padding: 24, maxWidth: 960, margin: "0 auto", fontFamily: "system-ui" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  info: { padding: "8px 12px", background: "#f3f9f3", borderRadius: 6 },
-  error: { color: "crimson" },
-  table: { width: "100%", borderCollapse: "collapse", marginTop: 12 },
-  th: { textAlign: "left", padding: 8, borderBottom: "2px solid #e5e5e5" },
-  td: { padding: 8, borderBottom: "1px solid #f0f0f0" },
-};

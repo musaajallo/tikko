@@ -1,16 +1,29 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import * as React from "react";
+import { Geist } from "next/font/google";
+import { Toaster } from "sonner";
+
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+import "./globals.css";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
 export const metadata: Metadata = {
   title: "tikko",
-  description: "ZKTeco terminal management.",
+  description: "Time Attendance Management System.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <body>{children as any}</body>
+    <html lang="en" className={cn(geist.variable)} suppressHydrationWarning>
+      <body>
+        <TooltipProvider>{children}</TooltipProvider>
+        <Toaster richColors closeButton position="top-right" />
+      </body>
     </html>
   );
 }
