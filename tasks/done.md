@@ -71,6 +71,14 @@
   - Patterns established: `SessionDep` annotated dep, `from_attributes=True` Pydantic config, response envelope `{ items, total }` for lists, UUID strings as IDs (sqlite-friendly), `created_at` defaulted with `datetime.now(UTC)`
   - conftest overrides `get_session` and resets `db_module._engine` per test for full isolation
 
+## F08 — pyzk wrapper + test-connection ✓
+- **Tests:** 11/11 (3 new: returns device info, 404 unknown device, 503 unreachable)
+- **Files:** src/tikko/zk/{__init__,client}.py, src/tikko/schemas/zk.py, route added to devices.py
+- **Wrapper:** `ZKClient.test_connection()` is synchronous (pyzk is sync); route wraps it with `asyncio.to_thread(...)` to keep the event loop free
+- **Errors:** `ZKConnectionError` → HTTP 503 with detail; unknown device → 404
+- **Tested via:** `unittest.mock.patch("tikko.routes.devices.ZKClient.test_connection", ...)` — no real device or network needed
+
+
 
 
 
