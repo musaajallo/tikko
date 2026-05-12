@@ -1,9 +1,11 @@
 import type { Device, DevicePunch } from "@tikko/shared-types";
 
-import { getToken } from "./auth";
+import { clearToken, getToken } from "./auth";
 
 const baseUrl =
   process.env.NEXT_PUBLIC_TIKKO_API_BASE_URL ?? "http://localhost:8000";
+
+const AUTH_PATHS = new Set(["/auth/login", "/auth/register"]);
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
@@ -17,6 +19,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const response = await fetch(`${baseUrl}${path}`, { ...init, headers });
   if (!response.ok) {
+    // Expired or rejected session: drop the token and bounce to /login. We
+    // do this for any 401 that isn't an actual auth call (so the login form
+    // can still surface "invalid credentials" inline).
+    if (response.status === 401 && !AUTH_PATHS.has(path) && typeof window !== "undefined") {
+      clearToken();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${response.statusText} — ${text}`);
   }
