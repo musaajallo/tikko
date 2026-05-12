@@ -78,6 +78,14 @@
 - **Errors:** `ZKConnectionError` → HTTP 503 with detail; unknown device → 404
 - **Tested via:** `unittest.mock.patch("tikko.routes.devices.ZKClient.test_connection", ...)` — no real device or network needed
 
+## F09 — Attendance log poll ✓
+- **Tests:** 15/15 (4 new: poll inserts + count, idempotent dedup, 404, list)
+- **Files:** src/tikko/models/attendance.py, src/tikko/schemas/attendance.py, ZKClient.get_attendance(), 2 new routes
+- **Routes:** POST /devices/{id}/poll → `{ polled, new }`, GET /devices/{id}/attendance → paginated `{ items, total }` with `?page=&page_size=`
+- **Dedup:** UniqueConstraint on (device_id, device_user_id, punched_at). Insert uses SQLite dialect's `on_conflict_do_nothing`; needs a small switch when running on Postgres in prod (deferred to dialect-routing later).
+- **RawPunch:** new dataclass in zk/client.py modeling one device-reported record before normalization.
+
+
 
 
 

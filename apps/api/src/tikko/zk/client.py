@@ -7,6 +7,7 @@ pyzk is synchronous; callers should run instance methods via
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from zk import ZK
 
@@ -21,6 +22,21 @@ class DeviceInfo:
     firmware_version: str
     platform: str
     device_name: str
+
+
+@dataclass(slots=True)
+class RawPunch:
+    """One attendance record as returned by the device.
+
+    `status` and `punch` are device-defined small integers (e.g. status 0/1/2/3/4/5
+    encodes check-in/check-out/break-out/break-in/overtime-in/overtime-out;
+    `punch` is the verify mode — fingerprint, face, password, etc.).
+    """
+
+    user_id: str
+    timestamp: datetime
+    status: int
+    punch: int
 
 
 class ZKClient:
@@ -46,6 +62,33 @@ class ZKClient:
                 platform=_as_str(conn.get_platform()),
                 device_name=_as_str(conn.get_device_name()),
             )
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+        finally:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+
+    def get_attendance(self) -> list[RawPunch]:
+        """Pull all attendance records currently buffered on the device."""
+        zk = ZK(self.host, port=self.port, timeout=self.timeout)
+        try:
+            conn = zk.connect()
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+
+        try:
+            records = conn.get_attendance() or []
+            return [
+                RawPunch(
+                    user_id=_as_str(r.user_id),
+                    timestamp=r.timestamp,
+                    status=int(getattr(r, "status", 0) or 0),
+                    punch=int(getattr(r, "punch", 0) or 0),
+                )
+                for r in records
+            ]
         except Exception as exc:
             raise ZKConnectionError(str(exc)) from exc
         finally:
