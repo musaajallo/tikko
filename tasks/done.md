@@ -124,6 +124,14 @@
 - **Errors:** 401 (missing/bad/expired token) with `WWW-Authenticate: Bearer`; 403 (wrong role) with `role 'X' not allowed`
 - **Retrospective:** Splitting auth into F12 (endpoints) and F13 (apply guards) caused churn — 15 existing tests had to be updated. Should have either bundled them or built auth into F07 from day one. Carry this lesson into F14+ planning: when a feature horizontally affects all existing endpoints/screens, scope it as one feature.
 
+## F14 — Login flow (web + mobile) ✓
+- **Tests:** web 11/11 (3 new auth + 2 new login), mobile 6/6 (3 new auth + 1 new login), typecheck + lint clean both
+- **Web:** lib/auth.ts (localStorage round-trip), app/login/page.tsx (form → POST /auth/login → setToken → router.push("/devices")), lib/api.ts auto-injects Authorization header from getToken()
+- **Mobile:** lib/auth.ts (expo-secure-store wrapper), lib/api.ts (fetch wrapper with auto-Authorization), app/login.tsx (TextInputs + Pressable button → router.replace("/"))
+- **Storage:** web → localStorage; mobile → SecureStore (encrypted on iOS keychain / Android keystore)
+- **Walking skeleton is now usable through the browser**: visit /login, sign in as an admin, /devices and /devices/:id/attendance work.
+
+
 
 
 

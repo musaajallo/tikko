@@ -58,16 +58,29 @@ pnpm --filter @tikko/web dev
 
 Expected: Next.js dev server on `http://localhost:3000`. Hot reload active.
 
-## 5. Register a device through the web UI
+## 4b. Create an admin user (one-time)
 
-1. Browse to `http://localhost:3000`.
-2. Confirm the home page shows the "tikko" heading and a "Devices" link.
-3. Click **Devices**.
-4. Fill the form:
+The `/devices*` endpoints are auth-gated as of F13. Register an admin once:
+
+```bash
+curl -s -X POST http://localhost:8000/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@tikko.local","password":"supersecret123","role":"admin"}' | jq .
+```
+
+## 5. Sign in through the web UI
+
+1. Browse to `http://localhost:3000` → click **Sign in**.
+2. Enter `admin@tikko.local` / `supersecret123`.
+3. On success you land on `/devices`. The access token is stored in `localStorage` (`tikko.access_token`) and auto-attached to every API call.
+
+## 5b. Register a device
+
+1. From `/devices`, fill the form:
    - Name: `Front gate`
    - Host: the IP of an actual ZKTeco terminal on your LAN (or any IP — connection will fail but the row will save)
    - Port: `4370`
-5. Click **Add device**. The list should refresh with the new row.
+2. Click **Add device**. The list should refresh with the new row.
 
 Expected: a row appears showing `Front gate`, `<host>:4370`, and the action buttons.
 

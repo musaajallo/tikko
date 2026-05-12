@@ -40,7 +40,7 @@
 
 - [x] F12 — User model + `POST /auth/register` + `POST /auth/login` + JWT issuance
 - [x] F13 — Auth middleware + role guards (`admin`, `manager`, `employee`); apply to existing routes
-- [ ] F14 — Mobile login flow + auth context + token storage (SecureStore)
+- [x] F14 — Mobile login flow + auth context + token storage (SecureStore)
 
 ### Real-time + ADMS push protocol
 
