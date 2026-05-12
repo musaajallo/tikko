@@ -9,7 +9,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <body>{children as any}</body>
     </html>
   );
 }

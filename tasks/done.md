@@ -85,6 +85,15 @@
 - **Dedup:** UniqueConstraint on (device_id, device_user_id, punched_at). Insert uses SQLite dialect's `on_conflict_do_nothing`; needs a small switch when running on Postgres in prod (deferred to dialect-routing later).
 - **RawPunch:** new dataclass in zk/client.py modeling one device-reported record before normalization.
 
+## F10 — Web devices page ✓
+- **Tests:** 4/4 web vitest (2 home + 2 devices page: list fetch + form POST→refetch), typecheck + lint clean
+- **Files:** apps/web/lib/api.ts (typed fetch client), app/devices/page.tsx (client component), `@tikko/shared-types` added as workspace dep
+- **Notes:**
+  - `@tikko/shared-types` linked via `workspace:*` in apps/web/package.json so the page imports `Device` types directly
+  - Hit React 19 types-collision bug on layout.tsx (two @types/react copies — one from web's direct dep, one transitive through next-dom). Pragmatic patch: `{children as any}` cast in app/layout.tsx. Real fix is a `pnpm.overrides` to pin @types/react across the workspace; deferred because mobile uses React 18 and unified pinning needs more care.
+  - Typed routes Link href cast `as never` for `/devices/[id]/attendance` since that route doesn't exist yet — will tighten in F11.
+
+
 
 
 
