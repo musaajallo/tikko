@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel older runs on the same branch/PR when a new one starts.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workspace:
+    name: workspace (install + format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Prettier check
+        run: pnpm exec prettier --check "**/*.{ts,tsx,js,jsx,json,md,yml,yaml}" || echo "::warning::prettier check failed — run pnpm format"
+
+  api:
+    name: api (pytest + ruff)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('apps/api/pyproject.toml') != '' }}
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install python
+        run: uv python install 3.13
+
+      - name: Install deps
+        run: uv sync --frozen
+
+      - name: Ruff
+        run: uv run ruff check .
+
+      - name: Pytest
+        run: uv run pytest -q
+
+  web:
+    name: web (lint + typecheck + vitest)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('apps/web/package.json') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @tikko/web lint
+      - run: pnpm --filter @tikko/web typecheck
+      - run: pnpm --filter @tikko/web test
+
+  mobile:
+    name: mobile (lint + typecheck + jest)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('apps/mobile/package.json') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @tikko/mobile lint
+      - run: pnpm --filter @tikko/mobile typecheck
+      - run: pnpm --filter @tikko/mobile test
+
+  packages:
+    name: packages (typecheck)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('packages/*/package.json') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r --filter "./packages/*" run typecheck

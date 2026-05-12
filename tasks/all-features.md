@@ -22,7 +22,7 @@
 ### Bootstrap
 
 - [x] F01 — Monorepo skeleton (pnpm workspaces, turbo, root scripts, .gitignore, .env.example, README, CLAUDE.md, git init)
-- [ ] F02 — CI workflow (GitHub Actions: lint + test + typecheck for api/web/mobile)
+- [x] F02 — CI workflow (GitHub Actions: lint + test + typecheck for api/web/mobile)
 - [ ] F03 — API skeleton (FastAPI + uv + pytest + `/health`, settings module reading `TIKKO_*`, ruff)
 - [ ] F04 — Web skeleton (Next.js + vitest + smoke test, eslint, tsconfig, base layout)
 - [ ] F05 — Mobile skeleton (Expo TS + jest + smoke test, eslint, tsconfig, base navigation)
