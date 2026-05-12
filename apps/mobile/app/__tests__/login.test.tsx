@@ -41,7 +41,7 @@ describe("Mobile login screen", () => {
 
     render(<Login />);
 
-    fireEvent.changeText(screen.getByPlaceholderText("Email"), "admin@tikko.local");
+    fireEvent.changeText(screen.getByPlaceholderText("Email"), "admin@example.com");
     fireEvent.changeText(screen.getByPlaceholderText("Password"), "supersecret123");
     fireEvent.press(screen.getByRole("button"));
 

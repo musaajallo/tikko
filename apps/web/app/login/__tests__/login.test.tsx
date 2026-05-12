@@ -39,7 +39,7 @@ describe("Login page", () => {
     render(<LoginPage />);
 
     fireEvent.change(screen.getByPlaceholderText(/email/i), {
-      target: { value: "admin@tikko.local" },
+      target: { value: "admin@example.com" },
     });
     fireEvent.change(screen.getByPlaceholderText(/password/i), {
       target: { value: "supersecret123" },
@@ -63,7 +63,7 @@ describe("Login page", () => {
     render(<LoginPage />);
 
     fireEvent.change(screen.getByPlaceholderText(/email/i), {
-      target: { value: "wrong@tikko.local" },
+      target: { value: "wrong@example.com" },
     });
     fireEvent.change(screen.getByPlaceholderText(/password/i), {
       target: { value: "nope" },

@@ -65,13 +65,13 @@ The `/devices*` endpoints are auth-gated as of F13. Register an admin once:
 ```bash
 curl -s -X POST http://localhost:8000/auth/register \
   -H 'content-type: application/json' \
-  -d '{"email":"admin@tikko.local","password":"supersecret123","role":"admin"}' | jq .
+  -d '{"email":"admin@example.com","password":"supersecret123","role":"admin"}' | jq .
 ```
 
 ## 5. Sign in through the web UI
 
 1. Browse to `http://localhost:3000` → click **Sign in**.
-2. Enter `admin@tikko.local` / `supersecret123`.
+2. Enter `admin@example.com` / `supersecret123`.
 3. On success you land on `/devices`. The access token is stored in `localStorage` (`tikko.access_token`) and auto-attached to every API call.
 
 ## 5b. Register a device
