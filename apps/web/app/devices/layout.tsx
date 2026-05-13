@@ -1,24 +1,18 @@
 import * as React from "react";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { TopBar } from "@/components/top-bar";
+import { TopNav } from "@/components/top-nav";
 
 export default function DevicesLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <div className="h-4 w-px bg-border" />
-          <span className="text-sm font-medium text-muted-foreground">
-            Time Attendance Management System
-          </span>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="flex min-h-screen flex-col bg-muted/30">
+      <TopBar />
+      <TopNav />
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 lg:px-8">
+        {children}
+      </main>
+    </div>
   );
 }

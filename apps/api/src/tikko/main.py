@@ -16,6 +16,7 @@ from tikko.models import AttendanceLog, Device, User  # noqa: F401 — register 
 from tikko.routes.auth import router as auth_router
 from tikko.routes.devices import router as devices_router
 from tikko.routes.iclock import router as iclock_router
+from tikko.routes.stats import router as stats_router
 from tikko.routes.ws import router as ws_router
 from tikko.scheduler import run_poll_loop
 from tikko.settings import get_settings
@@ -64,5 +65,6 @@ def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(devices_router)
+app.include_router(stats_router)
 app.include_router(iclock_router)
 app.include_router(ws_router)

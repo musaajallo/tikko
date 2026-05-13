@@ -7,12 +7,41 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-describe("Devices page", () => {
-  const fetchMock = vi.fn();
+interface MockResponse {
+  ok: boolean;
+  status?: number;
+  json: () => Promise<unknown>;
+  text?: () => Promise<string>;
+}
 
+const STATS_RESPONSE: MockResponse = {
+  ok: true,
+  json: async () => ({
+    devices: 0,
+    devices_enabled: 0,
+    devices_online: 0,
+    punches_today: 0,
+    punches_24h: 0,
+  }),
+};
+
+function routedFetch(routes: { url: RegExp; response: MockResponse }[]) {
+  // Returns a fetch mock that picks a response based on URL match. Each route
+  // can be consumed once; subsequent matching calls return the last response.
+  const remaining = routes.map((r) => ({ ...r, used: false }));
+  return vi.fn((url: string) => {
+    const next =
+      remaining.find((r) => !r.used && r.url.test(url)) ??
+      remaining.findLast?.((r) => r.url.test(url)) ??
+      remaining.find((r) => r.url.test(url));
+    if (next) next.used = true;
+    return Promise.resolve(next?.response ?? STATS_RESPONSE);
+  });
+}
+
+describe("Devices page", () => {
   beforeEach(() => {
-    fetchMock.mockReset();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.unstubAllGlobals();
   });
 
   afterEach(() => {
@@ -20,22 +49,29 @@ describe("Devices page", () => {
   });
 
   it("renders devices fetched from the api in a table", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        items: [
-          {
-            id: "id-1",
-            name: "Front gate",
-            host: "192.168.1.50",
-            port: 4370,
-            location: "HQ",
-            created_at: "2026-05-12T08:00:00Z",
-          },
-        ],
-        total: 1,
-      }),
-    });
+    const fetchMock = routedFetch([
+      { url: /\/stats/, response: STATS_RESPONSE },
+      {
+        url: /\/devices$/,
+        response: {
+          ok: true,
+          json: async () => ({
+            items: [
+              {
+                id: "id-1",
+                name: "Front gate",
+                host: "192.168.1.50",
+                port: 4370,
+                location: "HQ",
+                created_at: "2026-05-12T08:00:00Z",
+              },
+            ],
+            total: 1,
+          }),
+        },
+      },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<DevicesPage />);
 
@@ -46,45 +82,33 @@ describe("Devices page", () => {
   });
 
   it("opens the add-device dialog and posts a new device", async () => {
-    // initial GET /devices — empty
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ items: [], total: 0 }),
+    const created = {
+      id: "id-2",
+      name: "Lobby",
+      host: "10.0.0.5",
+      port: 4370,
+      location: null,
+      created_at: "2026-05-12T08:01:00Z",
+    };
+    const fetchMock = vi.fn();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/devices$/.test(url) && init?.method === "POST") {
+        return Promise.resolve({ ok: true, json: async () => created });
+      }
+      // GET /devices — empty until after POST
+      if (fetchMock.mock.calls.filter((c) => /\/devices$/.test(c[0]) && !c[1]?.method).length > 1) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [created], total: 1 }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ items: [], total: 0 }) });
     });
-    // POST /devices
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        id: "id-2",
-        name: "Lobby",
-        host: "10.0.0.5",
-        port: 4370,
-        location: null,
-        created_at: "2026-05-12T08:01:00Z",
-      }),
-    });
-    // refetch after POST
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        items: [
-          {
-            id: "id-2",
-            name: "Lobby",
-            host: "10.0.0.5",
-            port: 4370,
-            location: null,
-            created_at: "2026-05-12T08:01:00Z",
-          },
-        ],
-        total: 1,
-      }),
-    });
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<DevicesPage />);
 
-    // Wait for the empty state then click the header trigger (first of two
-    // "Add device" buttons; the second is the empty-state CTA).
     await screen.findByText(/no devices yet/i);
     const [triggerButton] = screen.getAllByRole("button", { name: /add device/i });
     fireEvent.click(triggerButton);
@@ -102,9 +126,9 @@ describe("Devices page", () => {
       expect(screen.getByText("Lobby")).toBeInTheDocument();
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    const postCall = fetchMock.mock.calls[1];
-    expect(postCall[0]).toMatch(/\/devices$/);
-    expect(postCall[1]?.method).toBe("POST");
+    const postCall = fetchMock.mock.calls.find(
+      (c) => /\/devices$/.test(c[0]) && c[1]?.method === "POST",
+    );
+    expect(postCall).toBeDefined();
   });
 });

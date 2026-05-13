@@ -62,12 +62,22 @@ export interface TokenResponse {
   token_type: "bearer";
 }
 
+export interface Stats {
+  devices: number;
+  devices_enabled: number;
+  devices_online: number;
+  punches_today: number;
+  punches_24h: number;
+}
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  getStats: () => request<Stats>("/stats"),
 
   listDevices: () => request<DeviceList>("/devices"),
 

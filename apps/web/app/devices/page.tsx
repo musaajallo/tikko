@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { KpiCards } from "@/components/kpi-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -117,10 +118,20 @@ export default function DevicesPage() {
   };
 
   return (
-    <Card>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Devices</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage terminals, test connectivity, and inspect live attendance.
+        </p>
+      </div>
+
+      <KpiCards />
+
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <div>
-          <CardTitle>Devices</CardTitle>
+          <CardTitle>All devices</CardTitle>
           <CardDescription>
             Terminals registered to this tenant.
           </CardDescription>
@@ -259,6 +270,7 @@ export default function DevicesPage() {
           </Table>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
