@@ -16,6 +16,7 @@ from tikko.adms import parse_attlog
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
+from tikko.realtime import get_broadcaster
 
 router = APIRouter(prefix="/iclock", tags=["iclock"])
 
@@ -101,6 +102,21 @@ async def cdata_upload(
     result = await session.execute(stmt)
     await session.flush()
     inserted = result.rowcount or 0
+
+    if inserted:
+        broadcaster = get_broadcaster()
+        for p in punches:
+            await broadcaster.publish(
+                {
+                    "type": "attendance.created",
+                    "device_id": device.id,
+                    "device_user_id": p.user_id,
+                    "punched_at": p.timestamp.isoformat(),
+                    "punch_type": p.status,
+                    "verify_mode": p.verify,
+                }
+            )
+
     return f"OK: {inserted}"
 
 

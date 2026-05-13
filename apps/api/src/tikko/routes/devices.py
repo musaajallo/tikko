@@ -13,6 +13,7 @@ from tikko.auth import get_current_user, require_role
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
+from tikko.realtime import get_broadcaster
 from tikko.schemas.attendance import AttendanceLogList, AttendanceLogRead, PollResult
 from tikko.schemas.device import DeviceCreate, DeviceList, DeviceRead
 from tikko.schemas.zk import DeviceInfoRead
@@ -158,6 +159,21 @@ async def poll_device(device_id: str, session: SessionDep) -> PollResult:
 
     new_count = await _insert_punches_dedup(session, device.id, punches)
     await session.flush()
+
+    if new_count:
+        broadcaster = get_broadcaster()
+        for p in punches:
+            await broadcaster.publish(
+                {
+                    "type": "attendance.created",
+                    "device_id": device.id,
+                    "device_user_id": p.user_id,
+                    "punched_at": p.timestamp.isoformat(),
+                    "punch_type": p.status,
+                    "verify_mode": p.punch,
+                }
+            )
+
     return PollResult(polled=len(punches), new=new_count)
 
 
