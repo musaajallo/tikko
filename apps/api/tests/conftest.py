@@ -7,11 +7,21 @@ production database.
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
+
+# Disable the background poller during tests — it would try to connect to
+# real devices on every tick. Must be set before tikko.main is imported.
+os.environ.setdefault("TIKKO_DISABLE_SCHEDULER", "1")
+
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 import tikko.db as db_module
 from tikko.db import get_session

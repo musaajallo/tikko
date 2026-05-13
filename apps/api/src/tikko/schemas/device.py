@@ -24,6 +24,9 @@ class DeviceRead(BaseModel):
     port: int
     location: str | None
     serial_number: str | None = None
+    enabled: bool = True
+    poll_interval_sec: int | None = None
+    last_polled_at: datetime | None = None
     created_at: datetime
 
 
