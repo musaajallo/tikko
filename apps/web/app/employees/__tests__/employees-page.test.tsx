@@ -228,6 +228,98 @@ describe("Employees page", () => {
     });
   });
 
+  it("opens the edit dialog and PATCHes the employee", async () => {
+    const employee = {
+      id: "emp-1",
+      employee_code: "1042",
+      full_name: "Ada Lovelace",
+      status: "active",
+      created_at: "2026-05-14T08:00:00Z",
+      updated_at: "2026-05-14T08:00:00Z",
+    };
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/employees\/emp-1$/.test(url) && init?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ...employee, full_name: "Ada Lovelace-Byron" }),
+        });
+      }
+      if (/\/employees/.test(url)) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [employee], total: 1 }),
+        });
+      }
+      return Promise.resolve(STATS_RESPONSE);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<EmployeesPage />);
+
+    await screen.findByText("Ada Lovelace");
+    await user.click(screen.getByRole("button", { name: /open menu/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /^edit$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(/full name/i), {
+      target: { value: "Ada Lovelace-Byron" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(
+        (c) => /\/employees\/emp-1$/.test(c[0]) && c[1]?.method === "PATCH",
+      );
+      expect(patch).toBeDefined();
+      expect(JSON.parse(patch![1]!.body as string)).toMatchObject({
+        full_name: "Ada Lovelace-Byron",
+        status: "active",
+      });
+    });
+  });
+
+  it("Delete dropdown opens a confirm dialog; Cancel doesn't DELETE", async () => {
+    const employee = {
+      id: "emp-1",
+      employee_code: "1042",
+      full_name: "Ada Lovelace",
+      status: "active",
+      created_at: "2026-05-14T08:00:00Z",
+      updated_at: "2026-05-14T08:00:00Z",
+    };
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
+      if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/employees/.test(url)) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ items: [employee], total: 1 }),
+        });
+      }
+      return Promise.resolve(STATS_RESPONSE);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<EmployeesPage />);
+
+    await screen.findByText("Ada Lovelace");
+    await user.click(screen.getByRole("button", { name: /open menu/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /^delete$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^cancel$/i }));
+
+    // No DELETE was issued.
+    const del = fetchMock.mock.calls.find(
+      (c) => /\/employees\/emp-1$/.test(c[0]) && c[1]?.method === "DELETE",
+    );
+    expect(del).toBeUndefined();
+  });
+
   it("deletes an employee via the row dropdown", async () => {
     const employee = {
       id: "emp-1",
@@ -271,7 +363,10 @@ describe("Employees page", () => {
 
     await screen.findByText("Ada Lovelace");
     await user.click(screen.getByRole("button", { name: /open menu/i }));
-    await user.click(await screen.findByText(/delete/i));
+    await user.click(await screen.findByRole("menuitem", { name: /^delete$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));
 
     await waitFor(() => {
       const deleteCall = fetchMock.mock.calls.find(

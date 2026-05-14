@@ -219,6 +219,15 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
+  updateEmployee: (
+    employeeId: string,
+    input: { full_name?: string; status?: EmployeeStatus; shift_rule_id?: string | null },
+  ) =>
+    request<Employee>(`/employees/${employeeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
   deleteEmployee: (employeeId: string) =>
     request<void>(`/employees/${employeeId}`, { method: "DELETE" }),
 

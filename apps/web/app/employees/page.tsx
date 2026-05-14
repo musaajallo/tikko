@@ -64,6 +64,16 @@ export default function EmployeesPage() {
   const [selectedDevices, setSelectedDevices] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState(false);
 
+  // Edit dialog
+  const [editTarget, setEditTarget] = useState<Employee | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStatus, setEditStatus] = useState<Employee["status"]>("active");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // Delete confirm dialog
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -105,15 +115,48 @@ export default function EmployeesPage() {
     }
   };
 
-  const onDelete = async (employee: Employee) => {
+  const openEdit = (employee: Employee) => {
+    setEditTarget(employee);
+    setEditName(employee.full_name);
+    setEditStatus(employee.status);
+  };
+  const closeEdit = () => setEditTarget(null);
+
+  const onEditSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editTarget) return;
+    setEditSubmitting(true);
     try {
-      await api.deleteEmployee(employee.id);
-      toast.success(`Removed ${employee.full_name}`);
+      await api.updateEmployee(editTarget.id, {
+        full_name: editName,
+        status: editStatus,
+      });
+      toast.success(`Updated ${editName}`);
+      closeEdit();
+      await refresh();
+    } catch (err) {
+      toast.error("Could not update employee", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const onConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteSubmitting(true);
+    try {
+      await api.deleteEmployee(deleteTarget.id);
+      toast.success(`Removed ${deleteTarget.full_name}`);
+      setDeleteTarget(null);
       await refresh();
     } catch (err) {
       toast.error("Could not delete employee", {
         description: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      setDeleteSubmitting(false);
     }
   };
 
@@ -263,11 +306,14 @@ export default function EmployeesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEdit(e)}>
+                            Edit
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openSync(e)}>
                             Sync to devices…
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => onDelete(e)}
+                            onClick={() => setDeleteTarget(e)}
                             className="text-destructive focus:text-destructive"
                           >
                             Delete
@@ -327,6 +373,77 @@ export default function EmployeesPage() {
             </Button>
             <Button onClick={onSync} disabled={syncing || devices.length === 0}>
               {syncing ? "Syncing…" : "Sync"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && closeEdit()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit employee</DialogTitle>
+            <DialogDescription>
+              Employee code is permanent; change name or status.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onEditSubmit} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit_full_name">Full name</Label>
+              <Input
+                id="edit_full_name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_status">Status</Label>
+              <select
+                id="edit_status"
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as Employee["status"])}
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+                <option value="terminated">terminated</option>
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeEdit}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editSubmitting}>
+                {editSubmitting ? "Saving…" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete employee?</DialogTitle>
+            <DialogDescription>
+              This removes {deleteTarget?.full_name ?? "the employee"} (#
+              {deleteTarget?.employee_code ?? "?"}) from the system. Their attendance
+              history stays on the linked device(s) until you clear it there.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onConfirmDelete}
+              disabled={deleteSubmitting}
+            >
+              {deleteSubmitting ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
