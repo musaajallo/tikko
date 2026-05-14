@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pyotp
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
 from tikko.auth import (
@@ -20,6 +20,7 @@ from tikko.models.user_totp import UserTOTP
 from tikko.schemas.employee import EmployeeRead
 from tikko.schemas.user import (
     AuthMeResponse,
+    ChangePasswordRequest,
     LoginPayload,
     TokenResponse,
     UserCreate,
@@ -105,3 +106,21 @@ async def login(payload: LoginPayload, session: SessionDep) -> TokenResponse:
         access_token=issue_access_token(user.id, user.role),
         refresh_token=issue_refresh_token(user.id, user.role),
     )
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: ChangePasswordRequest,
+    session: SessionDep,
+    current: CurrentUserDep,
+) -> Response:
+    user = await session.get(User, current.id)
+    if user is None:
+        # JWT outlived the row — treat as unauthenticated.
+        raise HTTPException(status_code=401, detail="user no longer exists")
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="invalid current password")
+
+    user.password_hash = hash_password(payload.new_password)
+    await session.flush()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

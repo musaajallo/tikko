@@ -103,6 +103,10 @@ export function TopBar() {
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel>Signed in</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile">Profile</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={signOut}>Sign out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

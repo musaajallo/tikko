@@ -123,6 +123,27 @@ export interface AttendanceReport {
   totals: AttendanceReportTotals;
 }
 
+export type UserRole = "admin" | "manager" | "employee";
+
+export interface UserMe {
+  id: string;
+  email: string;
+  role: UserRole;
+  employee_id: string | null;
+  created_at: string;
+}
+
+export interface AuthMeResponse {
+  user: UserMe;
+  employee: Employee | null;
+}
+
+export interface TOTPEnrollResponse {
+  secret: string;
+  otpauth_uri: string;
+  enabled: boolean;
+}
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -177,6 +198,29 @@ export const api = {
     request<AttendanceReport>(
       `/reports/attendance?employee_id=${employeeId}&month=${month}`,
     ),
+
+  getMe: () => request<AuthMeResponse>("/auth/me"),
+
+  changePassword: (input: { current_password: string; new_password: string }) =>
+    request<void>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  totpEnroll: () =>
+    request<TOTPEnrollResponse>("/auth/totp/enroll", { method: "POST" }),
+
+  totpVerify: (code: string) =>
+    request<{ enabled: boolean }>("/auth/totp/verify", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  totpDisable: (password: string) =>
+    request<void>("/auth/totp/disable", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
 
   // CSV download needs the bearer token, so a plain <a href> doesn't work.
   // We fetch as Blob and let the caller trigger a browser download.
