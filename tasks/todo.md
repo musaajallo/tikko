@@ -1,26 +1,26 @@
 # TODO
 
-## Session end (2026-05-12)
+## Session end (2026-05-14)
 
-F01–F14 complete and committed on `main`. Suite green:
-- api 31/31 · web 11/11 · mobile 6/6 · packages 8/8 = **56 tests**
+F01–F19 complete on `main`, plus a UI polish pass (Apex-style top bar, KPI cards, login refresh).
+- **api 49/49** green after F19 (was 31/31 at F14; +18 from F15–F19)
 
-The walking skeleton is now usable in a real browser end-to-end:
-**home → /login → /devices (add, test connection) → /devices/:id/attendance (poll, view).**
+The walking skeleton is now usable in a real browser end-to-end, with ADMS push protocol,
+WebSocket real-time feed, mobile real-time UI, a per-device background poller, and an
+in-process pyzk harness for tests + hardware-free dev.
 
 ## Resume here next session
 
 ## Up next
 
-- F15 — ADMS push receiver (`/iclock/cdata`, `/iclock/getrequest`) so push-firmware devices can stream events without polling
-- F16 — WebSocket real-time feed (`/ws/attendance`)
-- F17 — Mobile real-time feed UI
-- F18 — Background scheduler (per-device poll interval)
-- F19 — Mock device harness (fake pyzk server for tests + hardware-free dev)
-- F20+ — see `tasks/all-features.md` (employee enrollment, payroll, reports, hardening)
+- F20 — Employee model + CRUD + sync to one or many devices
+- F21 — Fingerprint template management + cross-device transfer
+- F22 — Web admin: employee enrollment page
+- F23+ — see `tasks/all-features.md` (mobile dashboard, leave, payroll, reports, hardening)
 
 ## Followups carried forward
 
+- Backfill `tasks/done.md` entries for F15–F18 + UI polish (notes only live in commit messages right now)
 - Migrate `next lint` → eslint CLI + flat config when bumping to Next 16
 - `pnpm.overrides` to align `@types/react` (currently band-aided with `{children as any}` in `app/layout.tsx`)
 - Replace `Base.metadata.create_all` with Alembic migrations before prod

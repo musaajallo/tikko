@@ -55,7 +55,7 @@
 ### Polling + dev ergonomics
 
 - [x] F18 — Background scheduler (per-device poll interval, runs as worker process)
-- [ ] F19 — Mock device harness (in-process fake pyzk server for tests + local dev without hardware)
+- [x] F19 — Mock device harness (in-process fake pyzk server for tests + local dev without hardware)
 
 ### Employee enrollment
 

@@ -131,6 +131,20 @@
 - **Storage:** web → localStorage; mobile → SecureStore (encrypted on iOS keychain / Android keystore)
 - **Walking skeleton is now usable through the browser**: visit /login, sign in as an admin, /devices and /devices/:id/attendance work.
 
+## F19 — Mock device harness ✓
+- **Tests:** api 49/49 (6 new in `test_zk_fake.py`), ruff clean
+- **Files:** `src/tikko/zk/fake.py` (new), `tests/test_zk_fake.py` (new)
+- **Public surface:**
+  - `FakeDevice(host, serial_number, firmware_version, platform, device_name, punches)` — mutable in-memory terminal state; `.add_punch(user_id, timestamp, status, punch)` appends a record.
+  - `FakeZK` — drop-in for `zk.ZK(host, port=, timeout=)`. `.connect()` looks the host up in the module registry and returns a `FakeConnection`; raises `ConnectionError` (caught by `ZKClient` and re-raised as `ZKConnectionError`) if no device is registered for that host.
+  - `use_fake_devices(*devices)` — context manager that monkeypatches the `ZK` symbol bound inside `tikko.zk.client` for the duration of the block, seeds the registry, and restores both on exit.
+- **Why pure in-process instead of a TCP fake on :4370:** the F19 win we needed was killing `unittest.mock.patch("tikko.routes.devices.ZKClient.<method>")` from the integration tests — pre-F19 you had to know the import site to patch correctly, and adding a method to `ZKClient` meant updating every patch path. `use_fake_devices()` lets a test drive the real `ZKClient` end-to-end. A TCP-listening fake is a future feature (needed for testing the pyzk wire protocol itself, not callers of it).
+- **Notes:**
+  - `FakeConnection` returns dataclass instances with `user_id`/`timestamp`/`status`/`punch` attributes — that's exactly the shape `ZKClient.get_attendance()` reads, so no shim needed.
+  - The context manager saves and restores the registry (not just the `ZK` symbol) so nested or accidentally-overlapping `use_fake_devices()` blocks don't leak fakes into each other.
+  - Existing tests under `test_attendance.py` / `test_zk_test_connection.py` still use `patch.object` and remain green — F19 is additive, no migration required.
+- **Followup:** swap the older patch-based tests over to `use_fake_devices` when next touching them (not a blocker).
+
 
 
 
