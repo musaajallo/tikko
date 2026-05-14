@@ -163,8 +163,18 @@
   - No Alembic migration yet (follows the existing pattern — tables created via `Base.metadata.create_all` in lifespan; followup carried in `todo.md`).
   - No `Employee ↔ User` linkage. They're different concepts: a `User` is an auth principal (admin/manager/employee), an `Employee` is a tracked human on a terminal. Joining them is a later feature, only if/when the mobile employee dashboard (F23) needs it.
 
-
-
+## F20-sync — POST /employees/:id/sync ✓ (closes the `all-features.md` F20 line)
+- **Tests:** api 75/75 (10 new in `test_employees_sync.py`), ruff clean
+- **Files:**
+  - `src/tikko/zk/client.py` — `ZKClient.set_user(user_id, name)` added: validates digits-only `user_id`, casts to `uid` int, calls `conn.set_user(uid=, name=, user_id=)`, wraps any pyzk exception as `ZKConnectionError`.
+  - `src/tikko/zk/fake.py` — new `FakeSyncedUser` dataclass; `FakeDevice.synced_users: dict[str, FakeSyncedUser]`; `FakeConnection.set_user(...)` records the call (signature matches pyzk: `uid, name='', privilege=0, password='', group_id='', user_id='', card=0`).
+  - `src/tikko/schemas/employee.py` — `EmployeeSyncRequest { device_ids: list[str] (min_length=1) }`, `EmployeeSyncEntry { device_id, status, error }`, `EmployeeSyncResult { results }`.
+  - `src/tikko/routes/employees.py` — `POST /employees/:id/sync` handler (admin). 404 if employee absent, 400 if any `device_id` not in DB, otherwise iterates devices in **request order** and produces a per-device `{status, error?}` entry. `set_user` is wrapped in `asyncio.to_thread` to keep the event loop free.
+  - `tests/test_employees_sync.py` — 10 tests: single device, multi-device, request-order preservation, unreachable device → `status: failed`, mixed success/failure, missing employee (404), unknown `device_id` (400), empty list (422), employee role (403), no token (401).
+- **Why per-device failures don't bubble to a 5xx:** the operator wants to know which devices took the user and which didn't, in one round trip. Returning 200 with a results array lets the web UI render "Synced to A, failed on B — retry?" without parsing partial-success out of an error body.
+- **Why iterate in request order:** the `select(... in_(device_ids))` query returns rows in arbitrary order, but the caller chose a sequence (e.g. "front gate first, then back door"); preserving it keeps the result intuitive.
+- **No DB persistence of sync state yet.** That belongs to F21 (when fingerprint templates land and we need a join table to track *which device has which template*). For now `synced_users` lives only on the (fake) device — real devices keep their own state.
+- **Walking skeleton is now usable end-to-end through enrollment**: register employee → POST /employees/:id/sync against one or more devices → device knows the user.
 
 
 

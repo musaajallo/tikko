@@ -97,6 +97,33 @@ class ZKClient:
             except Exception:
                 pass
 
+    def set_user(self, user_id: str, name: str) -> None:
+        """Enroll (or update) one user on the device.
+
+        `user_id` must be a digits-only string — the device-side `uid` slot is a
+        small int, and `tikko.schemas.employee.EmployeeCreate` already enforces
+        this pattern at the API boundary, so the cast is guarded by the schema.
+        """
+        if not user_id.isdigit():
+            raise ValueError(f"user_id must be digits-only; got {user_id!r}")
+        uid = int(user_id)
+
+        zk = ZK(self.host, port=self.port, timeout=self.timeout)
+        try:
+            conn = zk.connect()
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+
+        try:
+            conn.set_user(uid=uid, name=name, user_id=user_id)
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+        finally:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+
 
 def _as_str(value: object) -> str:
     if isinstance(value, bytes):

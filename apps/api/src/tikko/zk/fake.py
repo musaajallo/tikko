@@ -34,6 +34,15 @@ class _FakePunchRecord:
     punch: int
 
 
+@dataclass(slots=True)
+class FakeSyncedUser:
+    """What `FakeConnection.set_user(...)` records on the device."""
+
+    uid: int
+    user_id: str
+    name: str
+
+
 @dataclass
 class FakeDevice:
     """Mutable in-memory state for a single fake terminal, keyed by host.
@@ -48,6 +57,7 @@ class FakeDevice:
     platform: str = "JZ4775_TFT"
     device_name: str = "iClock Fake"
     punches: list[_FakePunchRecord] = field(default_factory=list)
+    synced_users: dict[str, FakeSyncedUser] = field(default_factory=dict)
 
     def add_punch(
         self, user_id: str, timestamp: datetime, status: int = 0, punch: int = 0
@@ -80,6 +90,21 @@ class FakeConnection:
 
     def get_attendance(self) -> list[_FakePunchRecord]:
         return list(self._device.punches)
+
+    def set_user(
+        self,
+        uid: int,
+        name: str = "",
+        privilege: int = 0,
+        password: str = "",
+        group_id: str = "",
+        user_id: str = "",
+        card: int = 0,
+    ) -> None:
+        key = user_id or str(uid)
+        self._device.synced_users[key] = FakeSyncedUser(
+            uid=uid, user_id=key, name=name
+        )
 
     def disconnect(self) -> None:
         return None
@@ -127,4 +152,10 @@ def use_fake_devices(*devices: FakeDevice) -> Iterator[None]:
         _REGISTRY.update(previous_registry)
 
 
-__all__ = ["FakeConnection", "FakeDevice", "FakeZK", "use_fake_devices"]
+__all__ = [
+    "FakeConnection",
+    "FakeDevice",
+    "FakeSyncedUser",
+    "FakeZK",
+    "use_fake_devices",
+]

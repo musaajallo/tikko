@@ -2,9 +2,9 @@
 
 ## Session end (2026-05-14)
 
-F01–F19 complete on `main`, plus a UI polish pass and **F20 employee CRUD** (sync deferred).
-- **api 65/65** green (49/49 after F19; +16 from F20 CRUD)
-- `all-features.md` F20 stays open until F20-sync lands.
+F01–F20 complete on `main`, plus a UI polish pass. F20-sync ships device-side enrollment.
+- **api 75/75** green (49/49 after F19; +16 F20 CRUD; +10 F20-sync)
+- `all-features.md` F20 line is closed.
 
 The walking skeleton is now usable in a real browser end-to-end, with ADMS push protocol,
 WebSocket real-time feed, mobile real-time UI, a per-device background poller, and an
@@ -14,8 +14,6 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next
 
-- **F20-sync** — `POST /employees/:id/sync` + `ZKClient.set_user` + `FakeConnection.set_user`
-  (drives the F19 harness end-to-end in tests; closes the `all-features.md` F20 line)
 - F21 — Fingerprint template management + cross-device transfer
 - F22 — Web admin: employee enrollment page
 - F23+ — see `tasks/all-features.md` (mobile dashboard, leave, payroll, reports, hardening)

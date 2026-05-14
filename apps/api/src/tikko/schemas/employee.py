@@ -40,3 +40,17 @@ class EmployeeRead(BaseModel):
 class EmployeeList(BaseModel):
     items: list[EmployeeRead]
     total: int
+
+
+class EmployeeSyncRequest(BaseModel):
+    device_ids: list[str] = Field(..., min_length=1)
+
+
+class EmployeeSyncEntry(BaseModel):
+    device_id: str
+    status: Literal["synced", "failed"]
+    error: str | None = None
+
+
+class EmployeeSyncResult(BaseModel):
+    results: list[EmployeeSyncEntry]
