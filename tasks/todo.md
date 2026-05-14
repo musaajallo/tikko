@@ -2,11 +2,11 @@
 
 ## Session end (2026-05-14)
 
-F01–F22 + F23-link complete on `main`, plus a UI polish pass and a login error-UX patch.
-- **api 108/108** · **web 16/16** · **shared-types 11/11** · **mobile 8/8** = 143 tests
-- Mobile suite is **flaky** — first jest run after a cold start sometimes fails with an `act(...)` warning on `Animated.View` from `TouchableOpacity` in `login.tsx`. Second run is reliably 8/8. Worth a small investigation when next touching mobile.
-- `all-features.md` F20 + F21 + F22 closed; F23 stays open until F23-mobile lands.
-- Dev SQLite: had to manually `ALTER TABLE users ADD COLUMN employee_id` because `Base.metadata.create_all` doesn't ALTER. Same reason as the F15-era drift. Alembic followup gaining weight.
+F01–F23 complete on `main`, plus a UI polish pass and a login error-UX patch.
+- **api 108/108** · **web 16/16** · **shared-types 11/11** · **mobile 10/10** = 145 tests
+- Mobile flakiness from F22 era didn't reproduce in F23-mobile runs (2/2 clean). Keep an eye on it.
+- `all-features.md` F20 + F21 + F22 + F23 closed.
+- Dev SQLite: had to manually `ALTER TABLE users ADD COLUMN employee_id` for F23-link. Alembic followup is now load-bearing — next schema change in a fresh dev env will hit the same trap.
 
 The walking skeleton is now usable in a real browser end-to-end, with ADMS push protocol,
 WebSocket real-time feed, mobile real-time UI, a per-device background poller, and an
@@ -16,7 +16,8 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next
 
-- **F23-mobile** — RN dashboard screen consuming `/auth/me` + `/me/attendance` + `/me/attendance/summary`. Shows linked employee header, monthly KPIs, recent punches list. Closes `all-features.md` F23.
+- **Alembic migrations** — replace `Base.metadata.create_all` (load-bearing followup now; next schema change in a fresh dev env will trip the same ALTER trap we just hit twice).
+- **F24** — Leave request model + endpoints (submit, list-own, list-team, approve/reject)
 - F22-edit (optional) — inline edit name + status on the row (PATCH `/employees/:id`)
 - F22-delete-confirm (optional) — guard the row "Delete" with a confirm dialog
 - Web UI for templates pull/push — there's no `/employees/:id/templates` page yet

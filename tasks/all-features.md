@@ -65,7 +65,7 @@
 
 ### Mobile UX + leave
 
-- [ ] F23 — Mobile employee dashboard (own attendance, monthly summary)
+- [x] F23 — Mobile employee dashboard (own attendance, monthly summary)
 - [ ] F24 — Leave request model + endpoints (submit, list-own, list-team, approve/reject)
 - [ ] F25 — Mobile manager view (team list, pending approvals)
 

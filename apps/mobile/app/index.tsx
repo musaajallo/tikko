@@ -8,7 +8,7 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       const token = await getToken();
-      if (token) router.replace("/feed");
+      if (token) router.replace("/dashboard");
     })();
   }, []);
 

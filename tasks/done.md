@@ -238,5 +238,18 @@
 - **Live-DB note:** the running `apps/api/tikko-dev.db` needed `ALTER TABLE users ADD COLUMN employee_id VARCHAR(36);` because we still don't have Alembic. That's another datapoint for the "replace `Base.metadata.create_all` with migrations" followup carried in `todo.md` — adding columns to existing tables in dev is currently a manual step.
 - **What F23-mobile will do:** a new RN screen consuming `GET /auth/me` (to discover the linked employee + name) and `GET /me/attendance` (recent rows) + `GET /me/attendance/summary?month=YYYY-MM` (header KPIs). Auth handling already in place from F14.
 
+## F23-mobile — Expo dashboard screen ✓ (closes `all-features.md` F23)
+- **Tests:** mobile 10/10 (2 new in `app/__tests__/dashboard.test.tsx`). Stable across two runs in a row (no F14-era flake observed).
+- **Files:**
+  - `apps/mobile/lib/api.ts` — types (`UserMe`, `EmployeeMe`, `AuthMeResponse`, `AttendanceLog`, `AttendanceList`, `AttendanceSummary`) + methods (`getMe`, `listMyAttendance`, `myMonthlySummary`).
+  - `apps/mobile/app/dashboard.tsx` (new) — header (employee name + `#code`), two KPI cards (`total_punches`, `days_present`), recent punches `FlatList`. Loading + error + empty states all handled inline.
+  - `apps/mobile/app/index.tsx` — authed users now route to `/dashboard` (was `/feed`). Dashboard itself falls back to `/feed` when `/auth/me` reports no linked employee — admins/managers see the live device feed they had before.
+- **Why dashboard owns the routing decision (not index):** index would otherwise need to hit `/auth/me` just to choose where to redirect. Letting dashboard fetch once and self-redirect on `employee === null` keeps index dumb and avoids a double network round trip in the linked-employee path.
+- **Current-month helper:** `currentMonth()` builds `YYYY-MM` from `Date.getUTCFullYear/getUTCMonth` — no date library. Future month picker (prev/next arrows) is a small follow-up if needed.
+- **KPI shape mirrors the api `AttendanceSummary`** — `total_punches` and `days_present` are the only numbers the screen needs today. Hours/late counts can come in F26 when shift rules land.
+- **Walking skeleton is now usable end-to-end on mobile**: log in as an enrolled employee → land on dashboard → see this month's KPIs and recent punches; an admin lands on the existing live feed instead.
+
+
+
 
 
