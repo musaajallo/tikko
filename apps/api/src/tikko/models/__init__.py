@@ -3,6 +3,7 @@
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
 from tikko.models.employee import Employee
+from tikko.models.employee_template import EmployeeTemplate
 from tikko.models.user import User
 
-__all__ = ["AttendanceLog", "Device", "Employee", "User"]
+__all__ = ["AttendanceLog", "Device", "Employee", "EmployeeTemplate", "User"]

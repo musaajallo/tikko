@@ -43,6 +43,14 @@ class FakeSyncedUser:
     name: str
 
 
+@dataclass(slots=True)
+class _FakeFinger:
+    """Mirrors the pyzk `Finger` object shape that consumers read: a `.template` bytes attr."""
+
+    finger_id: int
+    template: bytes
+
+
 @dataclass
 class FakeDevice:
     """Mutable in-memory state for a single fake terminal, keyed by host.
@@ -58,6 +66,7 @@ class FakeDevice:
     device_name: str = "iClock Fake"
     punches: list[_FakePunchRecord] = field(default_factory=list)
     synced_users: dict[str, FakeSyncedUser] = field(default_factory=dict)
+    templates: dict[str, dict[int, bytes]] = field(default_factory=dict)
 
     def add_punch(
         self, user_id: str, timestamp: datetime, status: int = 0, punch: int = 0
@@ -67,6 +76,10 @@ class FakeDevice:
                 user_id=user_id, timestamp=timestamp, status=status, punch=punch
             )
         )
+
+    def set_user_template(self, user_id: str, finger_id: int, data: bytes) -> None:
+        """Seed a fingerprint template on the fake device (test convenience)."""
+        self.templates.setdefault(user_id, {})[finger_id] = data
 
 
 class FakeConnection:
@@ -105,6 +118,15 @@ class FakeConnection:
         self._device.synced_users[key] = FakeSyncedUser(
             uid=uid, user_id=key, name=name
         )
+
+    def get_user_template(
+        self, uid: int, temp_id: int, user_id: str = ""
+    ) -> _FakeFinger | None:
+        key = user_id or str(uid)
+        data = self._device.templates.get(key, {}).get(temp_id)
+        if data is None:
+            return None
+        return _FakeFinger(finger_id=temp_id, template=data)
 
     def disconnect(self) -> None:
         return None

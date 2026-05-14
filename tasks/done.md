@@ -193,5 +193,20 @@
 - **204 handling in `request<T>`:** small change with broad scope — every existing caller returns a body, so the short-circuit is unreachable for them. Worth knowing if anyone later adds a `void`-returning endpoint with a non-204 status.
 - **Walking skeleton is now usable through the browser for enrollment**: log in as admin → `/employees` → Add → Sync to devices → toast confirms per-device results.
 
-
+## F21 — Fingerprint template pull ✓ (push deferred to F21-push)
+- **Tests:** api 87/87 (12 new in `test_employee_templates.py`), ruff clean.
+- **Files:**
+  - `src/tikko/models/employee_template.py` (new) — `EmployeeTemplate(id, employee_id FK, source_device_id FK, finger_id, template_data LargeBinary, captured_at)` with `UniqueConstraint(employee_id, source_device_id, finger_id)`.
+  - `src/tikko/zk/client.py` — `RawTemplate(finger_id, data)` dataclass; `ZKClient.get_user_templates(user_id)` iterates `finger_id` 0..9 via `conn.get_user_template(uid=, temp_id=, user_id=)` and returns only the enrolled slots.
+  - `src/tikko/zk/fake.py` — `FakeDevice.templates: dict[user_id][finger_id] = bytes` + `FakeDevice.set_user_template(...)` test helper; `FakeConnection.get_user_template(...)` returns a `_FakeFinger` with `.template` (matches pyzk's read shape) or `None`.
+  - `src/tikko/schemas/employee.py` — `TemplateRead` (no blob), `TemplateList`, `TemplatePullResult { stored, fingers }`.
+  - `src/tikko/routes/employees.py` — `POST /employees/:id/templates/pull?from_device_id=…` (admin), `GET /employees/:id/templates` (admin/manager).
+  - `src/tikko/models/__init__.py` + `main.py` updated to register `EmployeeTemplate`.
+- **Why "replace, don't merge" on pull:** the route deletes all existing rows for `(employee, source_device)` before re-inserting. If the operator re-enrolled finger 0 and removed finger 1 on the device, a merge-style pull would leave a stale finger-1 row in the DB. Replace keeps the DB faithful to the device's *current* state.
+- **Why store per source device:** templates aren't always portable across firmware/vendor versions. Keeping the source lets F21-push pick a compatible source for each target device rather than guessing.
+- **Why no template_data in list responses:** the blobs are kilobyte-scale per finger and only useful to the push step (which reads directly from the DB). Listing them through JSON would balloon responses and serialise binary the API doesn't need to expose.
+- **Notes:**
+  - No Alembic migration yet — still relying on `Base.metadata.create_all` in the lifespan (followup carried in `todo.md`).
+  - 503 surfaces for connect failures during pull; that's symmetric with `POST /devices/:id/test-connection` and `/poll`.
+  - F21-push will add `ZKClient.save_user_template` + `FakeConnection.save_user_template` and a `POST /employees/:id/templates/push` route that reads from `employee_templates` and writes to the target devices.
 

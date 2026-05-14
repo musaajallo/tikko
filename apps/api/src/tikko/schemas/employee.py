@@ -54,3 +54,23 @@ class EmployeeSyncEntry(BaseModel):
 
 class EmployeeSyncResult(BaseModel):
     results: list[EmployeeSyncEntry]
+
+
+class TemplateRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    employee_id: str
+    source_device_id: str
+    finger_id: int
+    captured_at: datetime
+
+
+class TemplateList(BaseModel):
+    items: list[TemplateRead]
+    total: int
+
+
+class TemplatePullResult(BaseModel):
+    stored: int
+    fingers: list[int]

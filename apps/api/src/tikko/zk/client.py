@@ -25,6 +25,14 @@ class DeviceInfo:
 
 
 @dataclass(slots=True)
+class RawTemplate:
+    """One fingerprint template as pulled off the device."""
+
+    finger_id: int
+    data: bytes
+
+
+@dataclass(slots=True)
 class RawPunch:
     """One attendance record as returned by the device.
 
@@ -89,6 +97,46 @@ class ZKClient:
                 )
                 for r in records
             ]
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+        finally:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+
+    def get_user_templates(self, user_id: str) -> list[RawTemplate]:
+        """Pull every enrolled fingerprint template for one user.
+
+        Iterates `finger_id` 0..9 because pyzk's `get_user_template` is keyed
+        by both `uid` and `temp_id` (the finger slot). Missing fingers come
+        back as `None`/empty and are skipped silently — only the enrolled
+        slots end up in the returned list.
+        """
+        if not user_id.isdigit():
+            raise ValueError(f"user_id must be digits-only; got {user_id!r}")
+        uid = int(user_id)
+
+        zk = ZK(self.host, port=self.port, timeout=self.timeout)
+        try:
+            conn = zk.connect()
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+
+        try:
+            templates: list[RawTemplate] = []
+            for finger_id in range(10):
+                tpl = conn.get_user_template(
+                    uid=uid, temp_id=finger_id, user_id=user_id
+                )
+                if tpl is None:
+                    continue
+                data = getattr(tpl, "template", None)
+                if data:
+                    templates.append(
+                        RawTemplate(finger_id=finger_id, data=bytes(data))
+                    )
+            return templates
         except Exception as exc:
             raise ZKConnectionError(str(exc)) from exc
         finally:

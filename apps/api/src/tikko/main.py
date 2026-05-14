@@ -16,6 +16,7 @@ from tikko.models import (  # noqa: F401 — register metadata
     AttendanceLog,
     Device,
     Employee,
+    EmployeeTemplate,
     User,
 )
 from tikko.routes.auth import router as auth_router

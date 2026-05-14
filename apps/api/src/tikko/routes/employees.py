@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from tikko.auth import require_role
 from tikko.db import SessionDep
 from tikko.models.device import Device
 from tikko.models.employee import Employee
+from tikko.models.employee_template import EmployeeTemplate
 from tikko.schemas.employee import (
     EmployeeCreate,
     EmployeeList,
@@ -20,6 +21,9 @@ from tikko.schemas.employee import (
     EmployeeSyncRequest,
     EmployeeSyncResult,
     EmployeeUpdate,
+    TemplateList,
+    TemplatePullResult,
+    TemplateRead,
 )
 from tikko.settings import get_settings
 from tikko.zk.client import ZKClient, ZKConnectionError
@@ -175,3 +179,84 @@ async def sync_employee(
             )
 
     return EmployeeSyncResult(results=results)
+
+
+@router.post(
+    "/{employee_id}/templates/pull",
+    response_model=TemplatePullResult,
+    dependencies=[_admin_only],
+)
+async def pull_templates(
+    employee_id: str,
+    session: SessionDep,
+    from_device_id: str = Query(..., description="Source device to read templates from"),
+) -> TemplatePullResult:
+    employee = await session.get(Employee, employee_id)
+    if employee is None:
+        raise HTTPException(status_code=404, detail="employee not found")
+
+    device = await session.get(Device, from_device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="source device not found")
+
+    settings = get_settings()
+    zk_client = ZKClient(
+        host=device.host,
+        port=device.port,
+        timeout=settings.zk_connect_timeout_sec,
+    )
+
+    try:
+        raw_templates = await asyncio.to_thread(
+            zk_client.get_user_templates, employee.employee_code
+        )
+    except ZKConnectionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+
+    # Replace any existing rows for (employee, source_device) so a re-pull
+    # reflects the device's current enrollment state rather than accumulating.
+    await session.execute(
+        delete(EmployeeTemplate).where(
+            EmployeeTemplate.employee_id == employee.id,
+            EmployeeTemplate.source_device_id == device.id,
+        )
+    )
+    for raw in raw_templates:
+        session.add(
+            EmployeeTemplate(
+                employee_id=employee.id,
+                source_device_id=device.id,
+                finger_id=raw.finger_id,
+                template_data=raw.data,
+            )
+        )
+    await session.flush()
+
+    return TemplatePullResult(
+        stored=len(raw_templates),
+        fingers=[t.finger_id for t in raw_templates],
+    )
+
+
+@router.get(
+    "/{employee_id}/templates",
+    response_model=TemplateList,
+    dependencies=[_admin_or_manager],
+)
+async def list_templates(employee_id: str, session: SessionDep) -> TemplateList:
+    employee = await session.get(Employee, employee_id)
+    if employee is None:
+        raise HTTPException(status_code=404, detail="employee not found")
+
+    result = await session.execute(
+        select(EmployeeTemplate)
+        .where(EmployeeTemplate.employee_id == employee_id)
+        .order_by(EmployeeTemplate.source_device_id, EmployeeTemplate.finger_id)
+    )
+    items = result.scalars().all()
+    return TemplateList(
+        items=[TemplateRead.model_validate(item) for item in items],
+        total=len(items),
+    )
