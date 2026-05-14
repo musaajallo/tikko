@@ -17,8 +17,14 @@ from tikko.auth import CurrentUserDep
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.employee import Employee
+from tikko.models.leave_request import LeaveRequest
 from tikko.models.user import User
 from tikko.schemas.attendance import AttendanceLogList, AttendanceLogRead
+from tikko.schemas.leave_request import (
+    LeaveRequestCreate,
+    LeaveRequestList,
+    LeaveRequestRead,
+)
 from tikko.schemas.me import AttendanceSummary
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -113,4 +119,57 @@ async def my_attendance_summary(
 
     return AttendanceSummary(
         month=month, total_punches=total, days_present=days_present
+    )
+
+
+@router.post(
+    "/leave-requests",
+    response_model=LeaveRequestRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def submit_leave_request(
+    payload: LeaveRequestCreate,
+    session: SessionDep,
+    current: CurrentUserDep,
+) -> LeaveRequest:
+    employee = await _linked_employee(session, current)
+    leave = LeaveRequest(
+        employee_id=employee.id,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        reason=payload.reason,
+        status="pending",
+    )
+    session.add(leave)
+    await session.flush()
+    return leave
+
+
+@router.get("/leave-requests", response_model=LeaveRequestList)
+async def list_my_leave_requests(
+    session: SessionDep,
+    current: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+) -> LeaveRequestList:
+    employee = await _linked_employee(session, current)
+    offset = (page - 1) * page_size
+    stmt = (
+        select(LeaveRequest)
+        .where(LeaveRequest.employee_id == employee.id)
+        .order_by(LeaveRequest.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    items = (await session.execute(stmt)).scalars().all()
+    total = (
+        await session.scalar(
+            select(func.count())
+            .select_from(LeaveRequest)
+            .where(LeaveRequest.employee_id == employee.id)
+        )
+    ) or 0
+    return LeaveRequestList(
+        items=[LeaveRequestRead.model_validate(item) for item in items],
+        total=total,
     )

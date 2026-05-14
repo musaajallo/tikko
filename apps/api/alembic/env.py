@@ -6,16 +6,11 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# Import the project's Base + every model module so Base.metadata is fully
-# populated for autogenerate. New models must be imported here too.
+# Import the project's Base + the models package so Base.metadata is fully
+# populated for autogenerate. New models only need to be registered in
+# tikko.models.__init__; this single import picks them all up automatically.
+import tikko.models  # noqa: F401
 from tikko.db import Base
-from tikko.models import (  # noqa: F401
-    AttendanceLog,
-    Device,
-    Employee,
-    EmployeeTemplate,
-    User,
-)
 from tikko.settings import get_settings
 
 # this is the Alembic Config object, which provides
