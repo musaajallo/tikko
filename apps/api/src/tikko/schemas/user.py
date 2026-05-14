@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from tikko.schemas.employee import EmployeeRead
+
 UserRole = Literal["admin", "manager", "employee"]
 
 
@@ -14,6 +16,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=10, max_length=128)
     role: UserRole = "employee"
+    # Optional link to an existing Employee by its employee_code; resolved at register.
+    employee_code: str | None = None
 
 
 class UserRead(BaseModel):
@@ -22,6 +26,7 @@ class UserRead(BaseModel):
     id: str
     email: EmailStr
     role: UserRole
+    employee_id: str | None = None
     created_at: datetime
 
 
@@ -34,3 +39,10 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: Literal["bearer"] = "bearer"
+
+
+class AuthMeResponse(BaseModel):
+    """`GET /auth/me` returns the current user plus the linked Employee (or null)."""
+
+    user: UserRead
+    employee: EmployeeRead | None = None

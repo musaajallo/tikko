@@ -1,4 +1,4 @@
-"""Auth: register and login."""
+"""Auth: register, login, /auth/me."""
 
 from __future__ import annotations
 
@@ -6,14 +6,23 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tikko.auth import (
+    CurrentUserDep,
     hash_password,
     issue_access_token,
     issue_refresh_token,
     verify_password,
 )
 from tikko.db import SessionDep
+from tikko.models.employee import Employee
 from tikko.models.user import User
-from tikko.schemas.user import LoginPayload, TokenResponse, UserCreate, UserRead
+from tikko.schemas.employee import EmployeeRead
+from tikko.schemas.user import (
+    AuthMeResponse,
+    LoginPayload,
+    TokenResponse,
+    UserCreate,
+    UserRead,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -24,14 +33,49 @@ async def register(payload: UserCreate, session: SessionDep) -> User:
     if existing is not None:
         raise HTTPException(status_code=409, detail="email already registered")
 
+    employee_id: str | None = None
+    if payload.employee_code is not None:
+        employee = await session.scalar(
+            select(Employee).where(Employee.employee_code == payload.employee_code)
+        )
+        if employee is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"employee_code {payload.employee_code!r} not found",
+            )
+        employee_id = employee.id
+
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
         role=payload.role,
+        employee_id=employee_id,
     )
     session.add(user)
     await session.flush()
     return user
+
+
+@router.get("/me", response_model=AuthMeResponse)
+async def get_me(
+    session: SessionDep,
+    current: CurrentUserDep,
+) -> AuthMeResponse:
+    user = await session.get(User, current.id)
+    if user is None:
+        # JWT was valid but the row vanished — treat as unauthenticated.
+        raise HTTPException(status_code=401, detail="user no longer exists")
+
+    employee_payload: EmployeeRead | None = None
+    if user.employee_id is not None:
+        employee = await session.get(Employee, user.employee_id)
+        if employee is not None:
+            employee_payload = EmployeeRead.model_validate(employee)
+
+    return AuthMeResponse(
+        user=UserRead.model_validate(user),
+        employee=employee_payload,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

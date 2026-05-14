@@ -223,3 +223,20 @@
 - **No fingers stored → still 200:** `fingers_pushed: 0` per device. The caller sees that nothing was pushed and can react (e.g. tell the user to pull first), rather than parsing a 4xx as a hard failure.
 - **Walking skeleton is now usable for cross-device enrollment**: pull from device A → push to devices B and C. The full F20+F20-sync+F21+F21-push loop runs end-to-end against the fake harness.
 
+## F23-link — User ↔ Employee + /auth/me + /me/attendance ✓ (F23 mobile-side follows)
+- **Tests:** api 108/108 (10 new across `test_auth_me.py` + `test_me_attendance.py`), ruff clean.
+- **Files:**
+  - `src/tikko/models/user.py` — added `employee_id: str | None` (nullable FK to `employees.id`, indexed). Admins/managers commonly aren't enrolled on a terminal, so the link is optional.
+  - `src/tikko/schemas/user.py` — `UserCreate.employee_code: str | None`, `UserRead.employee_id`, new `AuthMeResponse { user, employee | null }`.
+  - `src/tikko/routes/auth.py` — `POST /auth/register` resolves `employee_code → Employee.id` (404 if absent) and stores the FK. `GET /auth/me` returns `{user, employee}` for the bearer.
+  - `src/tikko/schemas/me.py` (new) — `AttendanceSummary { month, total_punches, days_present }`.
+  - `src/tikko/routes/me.py` (new) — `/me/attendance` (paginated) and `/me/attendance/summary?month=YYYY-MM`. A `_linked_employee` helper 403s if the User has no FK or the FK target row vanished.
+  - `src/tikko/main.py` — register the `/me` router.
+- **Why link at register time (not via a separate admin endpoint yet):** keeps the F23-link MVP small. A real flow (admin links users after registration) can come in a follow-up. Tests cover both paths: registered with `employee_code` → linked, without → unlinked + 403 on `/me/*`.
+- **Why "no link" is a 403, not a 200 with empty data:** the operator should learn that their account is not enrolled, not silently see an empty attendance list. Different signals serve different intent.
+- **Summary endpoint shape (`{month, total_punches, days_present}`):** kept tight. `days_present` is `COUNT(DISTINCT date(punched_at))` over the month range. Cross-dialect (`func.date(...)` works on both SQLite and Postgres for this purpose). More detail (first/last punch, hours worked, late/early) belongs in F26 (shift rules + payroll).
+- **Live-DB note:** the running `apps/api/tikko-dev.db` needed `ALTER TABLE users ADD COLUMN employee_id VARCHAR(36);` because we still don't have Alembic. That's another datapoint for the "replace `Base.metadata.create_all` with migrations" followup carried in `todo.md` — adding columns to existing tables in dev is currently a manual step.
+- **What F23-mobile will do:** a new RN screen consuming `GET /auth/me` (to discover the linked employee + name) and `GET /me/attendance` (recent rows) + `GET /me/attendance/summary?month=YYYY-MM` (header KPIs). Auth handling already in place from F14.
+
+
+
