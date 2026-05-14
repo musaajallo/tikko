@@ -2,9 +2,9 @@
 
 ## Session end (2026-05-14)
 
-F01–F26 complete on `main`, plus a UI polish pass, a login error-UX patch, Alembic adoption, and TopBar consolidation.
-- **api 148/148** · **web 16/16** · **shared-types 11/11** · **mobile 14/14** = 189 tests
-- `all-features.md` F20 + F21 + F22 + F23 + F24 + F25 + F26 all closed.
+F01–F27 complete on `main`, plus a UI polish pass, a login error-UX patch, Alembic adoption, and TopBar consolidation.
+- **api 164/164** · **web 16/16** · **shared-types 11/11** · **mobile 14/14** = 205 tests
+- `all-features.md` F20 + F21 + F22 + F23 + F24 + F25 + F26 + F27 all closed.
 - **Schema management: Alembic.** Three migrations: `8c51c515c891` (initial), `598bccf9f7db` (leave_requests), `2823730c4ea4` (shift_rules). Live `tikko-dev.db` at head. New environments: `cd apps/api && uv run alembic upgrade head`. New model → register in `tikko.models.__init__`; `alembic/env.py` picks it up via `import tikko.models`.
 - **Known migration gotcha**: when autogenerate emits a new FK inside `batch_alter_table` (SQLite path), hand-edit the file to name the constraint — autogen emits `create_foreign_key(None, ...)` and SQLite's batch mode rejects it. Hit once during F26, documented in the done.md entry.
 
@@ -16,7 +16,7 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next
 
-- **F27** — Payroll calc engine (pure functions, well-tested). Consumes ShiftRule + AttendanceLog to compute late/early/OT minutes per day, per employee.
+- **F28** — Report endpoints + CSV/XLSX export. Loads `Employee.shift_rule_id` → `ShiftRule`, pulls attendance for a date range, groups punches per day, calls `compute_day`, aggregates monthly + exports. Endpoints likely under `/reports/`.
 - Web counterpart for approvals — `/leave-requests` admin page (thin wrapper on the same endpoints; the mobile F25 screen is the only UI today).
 - F22-edit (optional) — inline edit name + status on the row (PATCH `/employees/:id`)
 - F22-delete-confirm (optional) — guard the row "Delete" with a confirm dialog

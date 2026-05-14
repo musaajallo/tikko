@@ -72,7 +72,7 @@
 ### Payroll + reports
 
 - [x] F26 — Shift rules model + per-employee assignment
-- [ ] F27 — Payroll calc engine (late, early, OT — pure functions, well-tested)
+- [x] F27 — Payroll calc engine (late, early, OT — pure functions, well-tested)
 - [ ] F28 — Report endpoints + CSV/XLSX export
 - [ ] F29 — Web admin reports page (filters + export buttons)
 

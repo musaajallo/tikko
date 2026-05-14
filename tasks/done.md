@@ -331,7 +331,19 @@
 - **Why `model_fields_set` for `shift_rule_id` assignment:** `EmployeeUpdate.shift_rule_id: str | None = None` can't distinguish "omitted" (leave assignment unchanged) from "explicit null" (detach) using just `is not None`. Checking presence in `model_fields_set` is the canonical Pydantic v2 way to keep both gestures.
 - **Walking skeleton extends to scheduling**: create shift rule → assign to employee via `PATCH /employees/:id { shift_rule_id }` → F27 will read the assignment to compute late/early/OT.
 
-
+## F27 — Payroll calc engine ✓
+- **Tests:** api 164/164 (16 new pure-function tests in `test_payroll_calc.py`), ruff clean. Tests run in 0.04s — no DB, no fixtures, no FastAPI.
+- **Files:**
+  - `src/tikko/payroll/__init__.py` (new) — public API: `ShiftSpec`, `DayMetrics`, `compute_day`.
+  - `src/tikko/payroll/calc.py` (new) — the engine. `ShiftSpec` is a frozen dataclass that mirrors the ORM `ShiftRule` shape without depending on SQLAlchemy. `compute_day(spec, punches, on_date) -> DayMetrics` does all the work in ~30 lines.
+- **Design decisions:**
+  - **Pure functions, decoupled from the ORM.** The engine never imports SQLAlchemy or FastAPI. F28's report endpoint will be responsible for loading `ShiftRule` + `AttendanceLog` rows and adapting them into `ShiftSpec` + `list[datetime]`. Keeping the calc free of those dependencies means it stays fast to test and easy to reason about — every case is "given these inputs, expect this output."
+  - **Naive in/out detection** (first punch = in, last = out). Many ZK terminals fail to classify check-in vs check-out reliably via `punch_type`. Min/max of the day's punches is robust against that noise. Caller can layer on smarter logic later if a real-device test reveals problems.
+  - **Punches outside `on_date` are filtered out.** An overnight stay's next-day punches don't bleed into the previous day's metrics. A separate "span" function can be added later if we want to model shifts that cross midnight; for now each calendar day stands alone.
+  - **Late and early-out are zero on non-workdays.** A weekend punch shouldn't generate "you were late on Saturday" — the rule wasn't in effect. Overtime, however, is still computed past `end_time + threshold` regardless of workday, so the caller can decide whether weekend OT counts (F28's policy call).
+  - **Single-punch edge case** is honest about uncertainty: `first_in == last_out`, `worked_minutes == 0`, lateness still computed from the lone punch. The data is partial; downstream tooling can flag it.
+  - **UTC-only for MVP.** The project already stores punches as UTC. Wall-clock-to-tz handling per organisation is a follow-up — adding it now without a real customer constraint risks the wrong abstraction.
+- **What F28 wires in:** read `Employee.shift_rule_id` → `ShiftRule`, pull the employee's attendance for a date range, group punches by `date()`, call `compute_day` per day, aggregate. CSV/XLSX export builds on the same daily metrics.
 
 
 
