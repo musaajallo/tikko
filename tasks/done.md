@@ -145,8 +145,23 @@
   - Existing tests under `test_attendance.py` / `test_zk_test_connection.py` still use `patch.object` and remain green — F19 is additive, no migration required.
 - **Followup:** swap the older patch-based tests over to `use_fake_devices` when next touching them (not a blocker).
 
-
-
+## F20 — Employee CRUD ✓ (sync deferred to F20-sync)
+- **Tests:** api 65/65 (16 new in `test_employees.py`), ruff clean
+- **Files:** `src/tikko/models/employee.py`, `src/tikko/schemas/employee.py`, `src/tikko/routes/employees.py` (all new); `models/__init__.py` + `main.py` updated to register.
+- **Routes:**
+  - `POST /employees` (admin) — 201; 409 on duplicate `employee_code`; 422 on non-numeric code.
+  - `GET /employees?page=&page_size=` (admin or manager) — `{items, total}`.
+  - `GET /employees/:id` (admin or manager) — 200; 404 if absent.
+  - `PATCH /employees/:id` (admin) — partial update over `full_name` + `status`; 422 on bad status; 404 if absent.
+  - `DELETE /employees/:id` (admin) — 204; 404 if absent. Hard delete for now (soft-delete is a later concern; rows the device knows about would block deletion in a more careful design, but F20 is small on purpose).
+- **Schema choices:**
+  - `employee_code` constrained at the Pydantic layer to `^\d+$`, max 32 chars. **Why:** keeps it interchangeable with the ZK `uid` int — F20-sync will pass `int(employee_code)` straight into `pyzk.set_user(uid=…, user_id=…)` with no separate mapping table.
+  - `status` is a `Literal["active", "inactive", "terminated"]`. `inactive` exists for the "on leave / contractor not currently scheduled" case so we don't have to choose between active and terminated when the right answer is "neither".
+- **Why split sync into F20-sync:**
+  - `all-features.md` F20 originally bundled "model + CRUD + sync". Splitting lets the CRUD surface stabilise before the device side touches it, and gives F20-sync a clean scope: just the `POST /employees/:id/sync` route plus `ZKClient.set_user` plus a matching `FakeConnection.set_user`. The `all-features.md` F20 checkbox stays open until F20-sync lands.
+- **Notes:**
+  - No Alembic migration yet (follows the existing pattern — tables created via `Base.metadata.create_all` in lifespan; followup carried in `todo.md`).
+  - No `Employee ↔ User` linkage. They're different concepts: a `User` is an auth principal (admin/manager/employee), an `Employee` is a tracked human on a terminal. Joining them is a later feature, only if/when the mobile employee dashboard (F23) needs it.
 
 
 
