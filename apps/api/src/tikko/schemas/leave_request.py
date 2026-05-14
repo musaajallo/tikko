@@ -39,3 +39,7 @@ class LeaveRequestRead(BaseModel):
 class LeaveRequestList(BaseModel):
     items: list[LeaveRequestRead]
     total: int
+
+
+class LeaveDecisionRequest(BaseModel):
+    decision: Literal["approved", "rejected"]

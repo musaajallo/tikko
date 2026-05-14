@@ -291,6 +291,20 @@
 - **Routing under `/me`:** symmetric with `/me/attendance` — these are first-person routes for the linked employee. Manager/admin views land at `/leave-requests` (no `/me/`) in F24-approve.
 - **F24-approve scope:** `GET /leave-requests?team=&status=` (admin/manager), `PATCH /leave-requests/:id/decision` body `{decision: "approved"|"rejected"}` — populates `decided_at = now()`, `decided_by_user_id = current_user.id`. 409 if already decided. Tests cover role gates + idempotence.
 
+## F24-approve — GET /leave-requests + PATCH /:id/decision ✓ (closes `all-features.md` F24)
+- **Tests:** api 129/129 (13 new in `test_leave_decisions.py`), ruff clean. No schema change — decision columns shipped in F24.
+- **Files:**
+  - `src/tikko/schemas/leave_request.py` — adds `LeaveDecisionRequest { decision: Literal["approved", "rejected"] }`.
+  - `src/tikko/routes/leave_requests.py` (new) — `GET /leave-requests` (admin/manager) with optional `status` filter, paginated, newest-first; `PATCH /leave-requests/:id/decision` (admin/manager) flips status, stamps `decided_at = utcnow()`, `decided_by_user_id = current.id`. 409 if `leave.status != "pending"`; 404 if absent.
+  - `src/tikko/main.py` — registers `leave_requests_router`.
+- **Why a 409 on already-decided instead of letting the second PATCH win:** approvals are stateful and "decided once" is part of the contract. A re-decision would silently overwrite who decided + when, which is the kind of audit-trail loss you can't get back. Idempotence-friendly responses (already-`approved` PATCH `approve` returns 409 too) keep the rule simple — no special-casing the same-decision branch.
+- **Why a separate `/leave-requests` router (not under `/me` or `/employees`):** these are manager/admin views of *everyone's* leave. `/me/leave-requests` is the first-person view; `/leave-requests` is the third-person view. Keeping them in separate modules makes the authz model legible at the URL — `_admin_or_manager` on the file vs. `_linked_employee` in `me.py`.
+- **Status filter is `LeaveStatus | None`:** omit → return all. Index on `leave_requests.status` (shipped in F24) keeps the filtered query fast even at scale.
+- **Lint note:** the `Query(...)` default for the `status` param tripped `B008`, while sibling `Query(1, ge=1)` did not. Ruff's FastAPI allowlist appears to require concrete (not `Union`) annotations to detect the marker, so the `status: LeaveStatus | None = Query(...)` line carries a `# noqa: B008` matching the pattern other routes already use implicitly. Worth revisiting if we switch the codebase to the `Annotated[..., Query(...)]` style.
+- **Walking skeleton now spans the leave workflow end-to-end**: employee submits via `POST /me/leave-requests` → manager sees it in `GET /leave-requests?status=pending` → manager decides via `PATCH /leave-requests/:id/decision` → employee sees the decision in their `GET /me/leave-requests` list.
+
+
+
 
 
 
