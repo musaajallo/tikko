@@ -249,6 +249,25 @@
 - **KPI shape mirrors the api `AttendanceSummary`** — `total_punches` and `days_present` are the only numbers the screen needs today. Hours/late counts can come in F26 when shift rules land.
 - **Walking skeleton is now usable end-to-end on mobile**: log in as an enrolled employee → land on dashboard → see this month's KPIs and recent punches; an admin lands on the existing live feed instead.
 
+## Infra — adopt Alembic; drop create_all from app bootstrap ✓
+- **Tests:** api 108/108 (unchanged), ruff clean (incl. `alembic/`).
+- **Files:**
+  - `apps/api/alembic.ini`, `apps/api/alembic/env.py`, `apps/api/alembic/versions/8c51c515c891_initial_schema.py` — initial migration covering users, devices, attendance_logs, employees, employee_templates plus the `User.employee_id` FK.
+  - `apps/api/alembic/env.py` — reads `database_url` from `tikko.settings.get_settings()` so the same `TIKKO_DATABASE_URL` drives both app and migrations; uses `Base.metadata` for autogenerate; enables `render_as_batch=True` on SQLite (so `op.batch_alter_table` is emitted — required for SQLite's limited ALTER) and `compare_type=True`.
+  - `apps/api/src/tikko/main.py` — lifespan no longer creates tables unconditionally; `create_all` runs only when `TIKKO_CREATE_TABLES_ON_STARTUP=1`. Real envs leave this unset and use `alembic upgrade head`.
+  - `apps/api/tests/conftest.py` — sets `TIKKO_CREATE_TABLES_ON_STARTUP=1` before importing `tikko.main`, so tests keep getting their schema built in-memory directly off `Base.metadata` (orders of magnitude faster than running migrations per test).
+- **Why a gate, not "tests run migrations":** an async aiosqlite `:memory:` engine relies on SQLAlchemy's `StaticPool` to share one connection across the test; running migrations outside that connection scope creates a different in-memory DB. Gating `create_all` inside the lifespan keeps everything inside the TestClient's loop and pool.
+- **Live dev DB workflow:**
+  - Existing `apps/api/tikko-dev.db` was stamped at `head` (revision `8c51c515c891`) so future migrations apply cleanly without trying to re-create the tables that are already there.
+  - For a fresh environment: `cd apps/api && uv run alembic upgrade head` then start the app.
+  - Smoke-tested on a throwaway empty DB: `alembic upgrade head` creates all five tables (+ `alembic_version`) with the right columns including `users.employee_id`.
+- **Why this matters now:** dev-env schema drift was a recurring tax — F15-era `devices.serial_number` missing, then F23-link's `users.employee_id` missing. Both required manual `ALTER TABLE` to fix. With Alembic in place, the next schema change is `uv run alembic revision --autogenerate -m "…"` + `alembic upgrade head` instead.
+- **Followups still on the list:**
+  - Adding a new model means importing it into both `tikko.models.__init__` AND `alembic/env.py`. Easy to forget; might be worth a one-line `import tikko.models` in env.py so the package `__init__` does the work.
+  - The dev SQLite path is fine for local work; Postgres migrations (the real prod target) haven't been exercised yet — first PG-dialect migration will be the moment we validate that path.
+
+
+
 
 
 

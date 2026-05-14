@@ -23,10 +23,20 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Tell the app's lifespan to create tables on startup (test-only convenience).
+# Real environments leave this unset and run `alembic upgrade head` instead.
+os.environ.setdefault("TIKKO_CREATE_TABLES_ON_STARTUP", "1")
+
 import tikko.db as db_module
 from tikko.db import get_session
 from tikko.main import app
-from tikko.models import Device  # noqa: F401 — register model with Base.metadata
+from tikko.models import (  # noqa: F401 — register models with Base.metadata
+    AttendanceLog,
+    Device,
+    Employee,
+    EmployeeTemplate,
+    User,
+)
 
 
 @pytest.fixture

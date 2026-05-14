@@ -32,11 +32,17 @@ from tikko.settings import get_settings
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Create tables on startup, then run the device-polling worker until
-    shutdown. Replaced by Alembic migrations in a later feature."""
-    engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Run the device-polling worker until shutdown.
+
+    Schema is managed by Alembic — run `uv run alembic upgrade head` before
+    starting the app in any new environment. Tests set
+    `TIKKO_CREATE_TABLES_ON_STARTUP=1` to skip migrations and build the schema
+    in-memory via `Base.metadata.create_all` for speed.
+    """
+    if os.getenv("TIKKO_CREATE_TABLES_ON_STARTUP") == "1":
+        engine = get_engine()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     # Skip the background loop in test runs so tests don't poll real devices.
     poller_task: asyncio.Task[None] | None = None

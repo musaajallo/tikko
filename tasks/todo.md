@@ -2,11 +2,10 @@
 
 ## Session end (2026-05-14)
 
-F01–F23 complete on `main`, plus a UI polish pass and a login error-UX patch.
+F01–F23 complete on `main`, plus a UI polish pass, a login error-UX patch, and Alembic adoption.
 - **api 108/108** · **web 16/16** · **shared-types 11/11** · **mobile 10/10** = 145 tests
-- Mobile flakiness from F22 era didn't reproduce in F23-mobile runs (2/2 clean). Keep an eye on it.
 - `all-features.md` F20 + F21 + F22 + F23 closed.
-- Dev SQLite: had to manually `ALTER TABLE users ADD COLUMN employee_id` for F23-link. Alembic followup is now load-bearing — next schema change in a fresh dev env will hit the same trap.
+- **Schema management: now Alembic.** `apps/api/alembic/` has the initial migration (`8c51c515c891`) covering all 5 tables + the `User.employee_id` FK. Live `tikko-dev.db` is stamped at head. New environments: `cd apps/api && uv run alembic upgrade head`. New model in code → also import it in `alembic/env.py` (or shortcut: import `tikko.models` there once).
 
 The walking skeleton is now usable in a real browser end-to-end, with ADMS push protocol,
 WebSocket real-time feed, mobile real-time UI, a per-device background poller, and an
@@ -16,8 +15,7 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next
 
-- **Alembic migrations** — replace `Base.metadata.create_all` (load-bearing followup now; next schema change in a fresh dev env will trip the same ALTER trap we just hit twice).
-- **F24** — Leave request model + endpoints (submit, list-own, list-team, approve/reject)
+- **F24** — Leave request model + endpoints (submit, list-own, list-team, approve/reject). First feature on the new Alembic path — workflow validation as much as a real feature.
 - F22-edit (optional) — inline edit name + status on the row (PATCH `/employees/:id`)
 - F22-delete-confirm (optional) — guard the row "Delete" with a confirm dialog
 - Web UI for templates pull/push — there's no `/employees/:id/templates` page yet
