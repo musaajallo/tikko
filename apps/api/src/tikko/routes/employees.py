@@ -13,6 +13,7 @@ from tikko.db import SessionDep
 from tikko.models.device import Device
 from tikko.models.employee import Employee
 from tikko.models.employee_template import EmployeeTemplate
+from tikko.models.shift_rule import ShiftRule
 from tikko.schemas.employee import (
     EmployeeCreate,
     EmployeeList,
@@ -110,6 +111,16 @@ async def update_employee(
         employee.full_name = payload.full_name
     if payload.status is not None:
         employee.status = payload.status
+    # `shift_rule_id` is nullable; "not provided" vs "set to null" matters.
+    # Use model_fields_set so callers can detach with an explicit None.
+    if "shift_rule_id" in payload.model_fields_set:
+        if payload.shift_rule_id is not None:
+            rule = await session.get(ShiftRule, payload.shift_rule_id)
+            if rule is None:
+                raise HTTPException(
+                    status_code=404, detail="shift rule not found"
+                )
+        employee.shift_rule_id = payload.shift_rule_id
 
     await session.flush()
     return employee

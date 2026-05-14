@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tikko.db import Base
@@ -31,6 +31,10 @@ class Employee(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active"
+    )
+    # Optional shift rule — drives F27's late/early/OT calc.
+    shift_rule_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("shift_rules.id"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow

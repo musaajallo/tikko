@@ -5,6 +5,7 @@ from tikko.models.device import Device
 from tikko.models.employee import Employee
 from tikko.models.employee_template import EmployeeTemplate
 from tikko.models.leave_request import LeaveRequest
+from tikko.models.shift_rule import ShiftRule
 from tikko.models.user import User
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "Employee",
     "EmployeeTemplate",
     "LeaveRequest",
+    "ShiftRule",
     "User",
 ]

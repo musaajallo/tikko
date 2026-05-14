@@ -18,6 +18,7 @@ from tikko.models import (  # noqa: F401 — register metadata
     Employee,
     EmployeeTemplate,
     LeaveRequest,
+    ShiftRule,
     User,
 )
 from tikko.routes.auth import router as auth_router
@@ -26,6 +27,7 @@ from tikko.routes.employees import router as employees_router
 from tikko.routes.iclock import router as iclock_router
 from tikko.routes.leave_requests import router as leave_requests_router
 from tikko.routes.me import router as me_router
+from tikko.routes.shift_rules import router as shift_rules_router
 from tikko.routes.stats import router as stats_router
 from tikko.routes.ws import router as ws_router
 from tikko.scheduler import run_poll_loop
@@ -84,6 +86,7 @@ app.include_router(devices_router)
 app.include_router(employees_router)
 app.include_router(me_router)
 app.include_router(leave_requests_router)
+app.include_router(shift_rules_router)
 app.include_router(stats_router)
 app.include_router(iclock_router)
 app.include_router(ws_router)

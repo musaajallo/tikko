@@ -24,6 +24,10 @@ class EmployeeCreate(BaseModel):
 class EmployeeUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     status: EmployeeStatus | None = None
+    # Nullable on purpose — omitting the field leaves the assignment unchanged
+    # (we honour `model_fields_set` at the route layer); sending `null`
+    # explicitly detaches the employee from their current shift rule.
+    shift_rule_id: str | None = None
 
 
 class EmployeeRead(BaseModel):
@@ -33,6 +37,7 @@ class EmployeeRead(BaseModel):
     employee_code: str
     full_name: str
     status: EmployeeStatus
+    shift_rule_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
