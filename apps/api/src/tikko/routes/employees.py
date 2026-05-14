@@ -23,10 +23,13 @@ from tikko.schemas.employee import (
     EmployeeUpdate,
     TemplateList,
     TemplatePullResult,
+    TemplatePushEntry,
+    TemplatePushRequest,
+    TemplatePushResult,
     TemplateRead,
 )
 from tikko.settings import get_settings
-from tikko.zk.client import ZKClient, ZKConnectionError
+from tikko.zk.client import RawTemplate, ZKClient, ZKConnectionError
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -238,6 +241,88 @@ async def pull_templates(
         stored=len(raw_templates),
         fingers=[t.finger_id for t in raw_templates],
     )
+
+
+@router.post(
+    "/{employee_id}/templates/push",
+    response_model=TemplatePushResult,
+    dependencies=[_admin_only],
+)
+async def push_templates(
+    employee_id: str,
+    payload: TemplatePushRequest,
+    session: SessionDep,
+) -> TemplatePushResult:
+    employee = await session.get(Employee, employee_id)
+    if employee is None:
+        raise HTTPException(status_code=404, detail="employee not found")
+
+    devices_result = await session.execute(
+        select(Device).where(Device.id.in_(payload.device_ids))
+    )
+    by_id = {d.id: d for d in devices_result.scalars().all()}
+    missing = [d for d in payload.device_ids if d not in by_id]
+    if missing:
+        raise HTTPException(
+            status_code=400, detail=f"unknown device_ids: {missing}"
+        )
+
+    # For each finger, pick the most recently captured template across all
+    # source devices. If two source rows tie on captured_at, ORM ordering by id
+    # is stable enough that the outcome is deterministic across a single run.
+    stored = (
+        await session.execute(
+            select(EmployeeTemplate)
+            .where(EmployeeTemplate.employee_id == employee.id)
+            .order_by(EmployeeTemplate.captured_at.desc())
+        )
+    ).scalars().all()
+    latest_per_finger: dict[int, EmployeeTemplate] = {}
+    for row in stored:
+        latest_per_finger.setdefault(row.finger_id, row)
+    raw = [
+        RawTemplate(finger_id=fid, data=row.template_data)
+        for fid, row in sorted(latest_per_finger.items())
+    ]
+
+    settings = get_settings()
+    results: list[TemplatePushEntry] = []
+    for device_id in payload.device_ids:
+        device = by_id[device_id]
+        zk_client = ZKClient(
+            host=device.host,
+            port=device.port,
+            timeout=settings.zk_connect_timeout_sec,
+        )
+        try:
+            # Ensure the user record exists on the device before writing
+            # templates. pyzk needs an enrolled user for save_user_template
+            # to take effect; set_user is idempotent so retrying is fine.
+            await asyncio.to_thread(
+                zk_client.set_user, employee.employee_code, employee.full_name
+            )
+            await asyncio.to_thread(
+                zk_client.save_user_templates, employee.employee_code, raw
+            )
+        except ZKConnectionError as exc:
+            results.append(
+                TemplatePushEntry(
+                    device_id=device.id,
+                    status="failed",
+                    fingers_pushed=0,
+                    error=str(exc),
+                )
+            )
+        else:
+            results.append(
+                TemplatePushEntry(
+                    device_id=device.id,
+                    status="pushed",
+                    fingers_pushed=len(raw),
+                )
+            )
+
+    return TemplatePushResult(results=results)
 
 
 @router.get(

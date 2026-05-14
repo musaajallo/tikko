@@ -74,3 +74,18 @@ class TemplateList(BaseModel):
 class TemplatePullResult(BaseModel):
     stored: int
     fingers: list[int]
+
+
+class TemplatePushRequest(BaseModel):
+    device_ids: list[str] = Field(..., min_length=1)
+
+
+class TemplatePushEntry(BaseModel):
+    device_id: str
+    status: Literal["pushed", "failed"]
+    fingers_pushed: int = 0
+    error: str | None = None
+
+
+class TemplatePushResult(BaseModel):
+    results: list[TemplatePushEntry]

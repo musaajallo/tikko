@@ -2,10 +2,10 @@
 
 ## Session end (2026-05-14)
 
-F01–F22 complete on `main` (F21 = pull half; push deferred to F21-push), plus a UI polish pass.
-- **api 87/87** · **web 16/16** · **shared-types 11/11** · **mobile 8/8** = 122 tests
+F01–F22 complete on `main`, plus a UI polish pass. Cross-device fingerprint enrollment loop closes.
+- **api 98/98** · **web 16/16** · **shared-types 11/11** · **mobile 8/8** = 133 tests
 - Mobile suite is **flaky** — first jest run after a cold start sometimes fails with an `act(...)` warning on `Animated.View` from `TouchableOpacity` in `login.tsx`. Second run is reliably 8/8. Worth a small investigation when next touching mobile.
-- `all-features.md` F20 + F22 lines closed; F21 stays open until F21-push lands.
+- `all-features.md` F20 + F21 + F22 all closed.
 
 The walking skeleton is now usable in a real browser end-to-end, with ADMS push protocol,
 WebSocket real-time feed, mobile real-time UI, a per-device background poller, and an
@@ -15,9 +15,10 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next
 
-- **F21-push** — `POST /employees/:id/templates/push {device_ids}` (reads stored
-  templates from `employee_templates`, writes to target devices via
-  `save_user_template`). Per-device + per-finger result envelope.
+- F23 — Mobile employee dashboard (own attendance, monthly summary)
+- F22-edit (optional) — inline edit name + status on the row (PATCH `/employees/:id`)
+- F22-delete-confirm (optional) — guard the row "Delete" with a confirm dialog
+- Web UI for templates pull/push — there's no `/employees/:id/templates` page yet
 - F22-edit (optional) — inline edit name + status on the row (PATCH `/employees/:id`)
 - F22-delete-confirm (optional) — guard the row "Delete" with a confirm dialog
 - F23+ — see `tasks/all-features.md` (mobile dashboard, leave, payroll, reports, hardening)

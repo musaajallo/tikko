@@ -210,3 +210,16 @@
   - 503 surfaces for connect failures during pull; that's symmetric with `POST /devices/:id/test-connection` and `/poll`.
   - F21-push will add `ZKClient.save_user_template` + `FakeConnection.save_user_template` and a `POST /employees/:id/templates/push` route that reads from `employee_templates` and writes to the target devices.
 
+## F21-push — POST /employees/:id/templates/push ✓ (closes `all-features.md` F21)
+- **Tests:** api 98/98 (11 new in `test_employee_templates_push.py`), ruff clean.
+- **Files:**
+  - `src/tikko/zk/client.py` — `ZKClient.save_user_templates(user_id, templates)` constructs `zk.finger.Finger` objects with `valid=1` and calls `conn.save_user_template(user=uid, fingers=[...])` once for the batch (single TCP round trip). Re-raises pyzk failures as `ZKConnectionError`.
+  - `src/tikko/zk/fake.py` — `FakeConnection.save_user_template(user, fingers)` mirrors the pyzk signature: accepts `user` as int / str / object-with-`.user_id`, normalises to the string key the rest of the fake uses, then writes each `finger.fid → finger.template` into `FakeDevice.templates`. This means a push roundtrips through the same `get_user_template` read path the pull half exercises.
+  - `src/tikko/schemas/employee.py` — `TemplatePushRequest { device_ids (min_length=1) }`, `TemplatePushEntry { device_id, status, fingers_pushed, error }`, `TemplatePushResult { results }`.
+  - `src/tikko/routes/employees.py` — `POST /employees/:id/templates/push` (admin). 404 on missing employee, 400 on unknown `device_id`. For each target device: `set_user` first, then `save_user_templates`. Per-device `ZKConnectionError` becomes `{status: "failed", fingers_pushed: 0, error}` rather than a 5xx, mirroring F20-sync's partial-success ergonomics.
+- **Latest-per-finger selection:** the route reads all `EmployeeTemplate` rows for the employee, orders by `captured_at desc`, then `setdefault(finger_id, row)` to keep the newest per slot. So if two source devices both have finger 0, the most recently captured wins. Ties on `captured_at` resolve by ORM read order; deterministic within a run but not specified across runs.
+- **Why `set_user` runs before every push:** pyzk's `save_user_template` requires the user record to exist on the device; otherwise the device silently rejects the write. `set_user` is idempotent (overwrites with the same data), so calling it on every push is cheap and removes a precondition the operator would otherwise have to enforce manually.
+- **Why one TCP round trip per device for the whole batch:** pyzk's `save_user_template` accepts a list of fingers, so calling it once with N fingers is one connect/setup/disconnect rather than N. Latency-bound, not bandwidth-bound, so the batching matters.
+- **No fingers stored → still 200:** `fingers_pushed: 0` per device. The caller sees that nothing was pushed and can react (e.g. tell the user to pull first), rather than parsing a 4xx as a hard failure.
+- **Walking skeleton is now usable for cross-device enrollment**: pull from device A → push to devices B and C. The full F20+F20-sync+F21+F21-push loop runs end-to-end against the fake harness.
+

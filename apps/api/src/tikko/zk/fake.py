@@ -128,6 +128,24 @@ class FakeConnection:
             return None
         return _FakeFinger(finger_id=temp_id, template=data)
 
+    def save_user_template(self, user: object, fingers: list[object]) -> None:
+        """Mirror pyzk's `save_user_template(user, fingers=[])`.
+
+        `user` can be an int uid, str uid, or a `User`-like object exposing
+        `user_id`; we normalise to the string key the rest of the fake uses.
+        Each `finger` is expected to expose `.fid` (the slot 0..9) and
+        `.template` (the bytes blob), matching `zk.finger.Finger`.
+        """
+        if hasattr(user, "user_id") and user.user_id:  # type: ignore[attr-defined]
+            key = str(user.user_id)  # type: ignore[attr-defined]
+        else:
+            key = str(user)
+        bucket = self._device.templates.setdefault(key, {})
+        for finger in fingers:
+            fid = int(finger.fid)  # type: ignore[attr-defined]
+            data = finger.template  # type: ignore[attr-defined]
+            bucket[fid] = bytes(data)
+
     def disconnect(self) -> None:
         return None
 

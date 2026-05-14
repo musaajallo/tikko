@@ -6,10 +6,12 @@ pyzk is synchronous; callers should run instance methods via
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
 from zk import ZK
+from zk.finger import Finger
 
 
 class ZKConnectionError(Exception):
@@ -137,6 +139,39 @@ class ZKClient:
                         RawTemplate(finger_id=finger_id, data=bytes(data))
                     )
             return templates
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+        finally:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+
+    def save_user_templates(
+        self, user_id: str, templates: Sequence[RawTemplate]
+    ) -> None:
+        """Write a batch of fingerprint templates to the device for one user.
+
+        Note: pyzk's `save_user_template` expects the user record to already
+        exist on the device. Callers (e.g. the push route) should call
+        `set_user` first to guarantee that.
+        """
+        if not user_id.isdigit():
+            raise ValueError(f"user_id must be digits-only; got {user_id!r}")
+        uid = int(user_id)
+
+        zk = ZK(self.host, port=self.port, timeout=self.timeout)
+        try:
+            conn = zk.connect()
+        except Exception as exc:
+            raise ZKConnectionError(str(exc)) from exc
+
+        try:
+            fingers = [
+                Finger(uid=uid, fid=t.finger_id, valid=1, template=t.data)
+                for t in templates
+            ]
+            conn.save_user_template(user=uid, fingers=fingers)
         except Exception as exc:
             raise ZKConnectionError(str(exc)) from exc
         finally:
