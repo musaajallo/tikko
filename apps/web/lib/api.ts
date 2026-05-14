@@ -95,6 +95,34 @@ export interface EmployeeSyncResult {
   results: EmployeeSyncEntry[];
 }
 
+export interface AttendanceReportDay {
+  date: string; // YYYY-MM-DD
+  is_workday: boolean;
+  is_absent: boolean;
+  first_in: string | null;
+  last_out: string | null;
+  worked_minutes: number;
+  late_minutes: number;
+  early_out_minutes: number;
+  overtime_minutes: number;
+}
+
+export interface AttendanceReportTotals {
+  days_worked: number;
+  days_absent: number;
+  worked_minutes: number;
+  late_minutes: number;
+  early_out_minutes: number;
+  overtime_minutes: number;
+}
+
+export interface AttendanceReport {
+  month: string;
+  employee: { id: string; employee_code: string; full_name: string };
+  days: AttendanceReportDay[];
+  totals: AttendanceReportTotals;
+}
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -144,4 +172,31 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ device_ids: deviceIds }),
     }),
+
+  attendanceReport: (employeeId: string, month: string) =>
+    request<AttendanceReport>(
+      `/reports/attendance?employee_id=${employeeId}&month=${month}`,
+    ),
+
+  // CSV download needs the bearer token, so a plain <a href> doesn't work.
+  // We fetch as Blob and let the caller trigger a browser download.
+  async downloadAttendanceCsv(
+    employeeId: string,
+    month: string,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const token = getToken();
+    const url = `${baseUrl}/reports/attendance.csv?employee_id=${employeeId}&month=${month}`;
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`${response.status} ${response.statusText} — ${text}`);
+    }
+    const blob = await response.blob();
+    const cd = response.headers.get("content-disposition") ?? "";
+    const match = /filename="?([^"]+)"?/i.exec(cd);
+    const filename = match?.[1] ?? `attendance-${month}.csv`;
+    return { blob, filename };
+  },
 };

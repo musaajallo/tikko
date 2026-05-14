@@ -362,7 +362,17 @@
 - **XLSX deferred to F28-xlsx**: requires `openpyxl` and writes a workbook with a summary sheet + daily sheet. Skipping until someone asks — adds a non-trivial dep we don't yet have a justification for.
 - **Walking skeleton extends to reporting**: assign a shift rule to an employee → punch attendance → `GET /reports/attendance?employee_id=&month=YYYY-MM` returns daily + monthly metrics; `.csv` variant downloads.
 
-
+## F29 — Web admin reports page ✓
+- **Tests:** web 20/20 (4 new in `reports-page.test.tsx`), typecheck + lint clean.
+- **Files:**
+  - `apps/web/lib/api.ts` — new types (`AttendanceReportDay`, `AttendanceReportTotals`, `AttendanceReport`) + methods (`attendanceReport`, `downloadAttendanceCsv`). The CSV method uses raw `fetch` + Bearer auth → `Blob` → parses `Content-Disposition` for the filename so the caller can trigger an `<a download>` themselves.
+  - `apps/web/app/reports/page.tsx` — replaces the F22-era `ComingSoon` placeholder. Client component: employee `<select>` populated from `listEmployees`, `<input type="month">` for the period, Run + Download CSV buttons, totals KPI strip + daily breakdown table.
+  - `apps/web/components/top-bar.tsx` — drops the `SOON` badge on Reports (Settings + Docs stay marked).
+- **Why `Blob` for the CSV download instead of `<a href>`:** `/reports/attendance.csv` requires a Bearer token; the browser doesn't attach our auth header on plain link clicks. Fetch-as-Blob + `URL.createObjectURL` + a synthesised `<a download>` keeps auth on the request and still hands the user a real file. Filename comes from `Content-Disposition` so it stays consistent with what the server already chose.
+- **Friendly 422 handling:** when the API returns "employee has no assigned shift rule", the page surfaces "This employee has no assigned shift rule. Assign one on the Employees page and try again." instead of the raw `422 Unprocessable Entity — …` string. Other errors fall through to the original message — over-specialising every API error in the UI would be more code than it's worth right now.
+- **Native `<input type="month">`:** no date library, no extra deps. Returns the `YYYY-MM` string the API already expects.
+- **No row filter / sort yet:** every calendar day is rendered (~30 rows per month is fine in one viewport). If reports grow to multi-month views or large teams, this is where pagination + virtualisation would land.
+- **`<select>` over shadcn `Select`:** the codebase doesn't have the shadcn `Select` primitive yet, and a native `<select>` is fully sufficient for "pick one employee". Avoided dragging in the dep just for this screen.
 
 
 
