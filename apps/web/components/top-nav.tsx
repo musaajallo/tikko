@@ -14,6 +14,7 @@ type NavItem = {
 
 const left: NavItem[] = [
   { href: "/devices" as Route, label: "Devices" },
+  { href: "/employees" as Route, label: "Employees" },
   { href: "/reports" as Route, label: "Reports", disabled: true },
   { href: "/settings" as Route, label: "Settings", disabled: true },
 ];

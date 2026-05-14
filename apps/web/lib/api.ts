@@ -1,4 +1,10 @@
-import type { Device, DevicePunch } from "@tikko/shared-types";
+import type {
+  Device,
+  DevicePunch,
+  Employee,
+  EmployeeStatus,
+  EmployeeSyncEntry,
+} from "@tikko/shared-types";
 
 import { clearToken, getToken } from "./auth";
 
@@ -30,6 +36,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${response.statusText} — ${text}`);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return response.json() as Promise<T>;
 }
@@ -70,6 +79,15 @@ export interface Stats {
   punches_24h: number;
 }
 
+export interface EmployeeList {
+  items: Employee[];
+  total: number;
+}
+
+export interface EmployeeSyncResult {
+  results: EmployeeSyncEntry[];
+}
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -97,4 +115,26 @@ export const api = {
     request<AttendanceList>(
       `/devices/${deviceId}/attendance?page=${page}&page_size=${pageSize}`,
     ),
+
+  listEmployees: (page = 1, pageSize = 50) =>
+    request<EmployeeList>(`/employees?page=${page}&page_size=${pageSize}`),
+
+  createEmployee: (input: {
+    employee_code: string;
+    full_name: string;
+    status?: EmployeeStatus;
+  }) =>
+    request<Employee>("/employees", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  deleteEmployee: (employeeId: string) =>
+    request<void>(`/employees/${employeeId}`, { method: "DELETE" }),
+
+  syncEmployee: (employeeId: string, deviceIds: string[]) =>
+    request<EmployeeSyncResult>(`/employees/${employeeId}/sync`, {
+      method: "POST",
+      body: JSON.stringify({ device_ids: deviceIds }),
+    }),
 };

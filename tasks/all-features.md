@@ -61,7 +61,7 @@
 
 - [x] F20 — Employee model + CRUD endpoints + sync to one or many devices
 - [ ] F21 — Fingerprint template management + cross-device transfer
-- [ ] F22 — Web admin: employee enrollment page (CRUD + which-devices-to-sync)
+- [x] F22 — Web admin: employee enrollment page (CRUD + which-devices-to-sync)
 
 ### Mobile UX + leave
 

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { DeployMode, DevicePunchSchema, DeviceSchema, UserRole } from "./index";
+import {
+  DeployMode,
+  DevicePunchSchema,
+  DeviceSchema,
+  EmployeeSchema,
+  EmployeeStatus,
+  EmployeeSyncEntrySchema,
+  UserRole,
+} from "./index";
 
 describe("DeviceSchema", () => {
   it("accepts a valid device", () => {
@@ -63,5 +71,58 @@ describe("enums", () => {
     expect(UserRole.ADMIN).toBe("admin");
     expect(UserRole.MANAGER).toBe("manager");
     expect(UserRole.EMPLOYEE).toBe("employee");
+  });
+
+  it("exposes EmployeeStatus values", () => {
+    expect(EmployeeStatus.ACTIVE).toBe("active");
+    expect(EmployeeStatus.INACTIVE).toBe("inactive");
+    expect(EmployeeStatus.TERMINATED).toBe("terminated");
+  });
+});
+
+describe("EmployeeSchema", () => {
+  it("parses a valid employee", () => {
+    const parsed = EmployeeSchema.parse({
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      employee_code: "1042",
+      full_name: "Ada Lovelace",
+      status: "active",
+      created_at: "2026-05-14T08:00:00Z",
+      updated_at: "2026-05-14T08:00:00Z",
+    });
+    expect(parsed.employee_code).toBe("1042");
+  });
+
+  it("rejects a non-numeric employee_code", () => {
+    expect(() =>
+      EmployeeSchema.parse({
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        employee_code: "ABC-1",
+        full_name: "x",
+        status: "active",
+        created_at: "2026-05-14T08:00:00Z",
+        updated_at: "2026-05-14T08:00:00Z",
+      }),
+    ).toThrow();
+  });
+});
+
+describe("EmployeeSyncEntrySchema", () => {
+  it("parses a synced entry", () => {
+    const parsed = EmployeeSyncEntrySchema.parse({
+      device_id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "synced",
+      error: null,
+    });
+    expect(parsed.status).toBe("synced");
+  });
+
+  it("parses a failed entry with an error string", () => {
+    const parsed = EmployeeSyncEntrySchema.parse({
+      device_id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "failed",
+      error: "connect timeout",
+    });
+    expect(parsed.error).toBe("connect timeout");
   });
 });

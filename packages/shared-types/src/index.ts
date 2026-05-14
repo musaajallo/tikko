@@ -40,3 +40,31 @@ export const UserRole = {
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export const EmployeeStatus = {
+  ACTIVE: "active",
+  INACTIVE: "inactive",
+  TERMINATED: "terminated",
+} as const;
+
+export type EmployeeStatus =
+  (typeof EmployeeStatus)[keyof typeof EmployeeStatus];
+
+export const EmployeeSchema = z.object({
+  id: z.string().uuid(),
+  employee_code: z.string().regex(/^\d+$/),
+  full_name: z.string().min(1),
+  status: z.enum(["active", "inactive", "terminated"]),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type Employee = z.infer<typeof EmployeeSchema>;
+
+export const EmployeeSyncEntrySchema = z.object({
+  device_id: z.string().uuid(),
+  status: z.enum(["synced", "failed"]),
+  error: z.string().nullable().default(null),
+});
+
+export type EmployeeSyncEntry = z.infer<typeof EmployeeSyncEntrySchema>;

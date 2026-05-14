@@ -176,8 +176,22 @@
 - **No DB persistence of sync state yet.** That belongs to F21 (when fingerprint templates land and we need a join table to track *which device has which template*). For now `synced_users` lives only on the (fake) device — real devices keep their own state.
 - **Walking skeleton is now usable end-to-end through enrollment**: register employee → POST /employees/:id/sync against one or more devices → device knows the user.
 
-
-
+## F22 — Web `/employees` page ✓
+- **Tests:** web 16/16 (5 new in `app/employees/__tests__/employees-page.test.tsx`); shared-types 11/11 (4 new for `EmployeeSchema` + `EmployeeStatus` + `EmployeeSyncEntrySchema`); typecheck + lint clean. api re-run 75/75 to confirm no cross-package break.
+- **Files:**
+  - `packages/shared-types/src/index.ts` — `EmployeeStatus`, `EmployeeSchema`, `EmployeeSyncEntrySchema` (Zod) so the web app validates the API shape it consumes.
+  - `apps/web/lib/api.ts` — `listEmployees`, `createEmployee`, `deleteEmployee`, `syncEmployee` methods; **also**: `request<T>` now short-circuits on HTTP 204 (returns `undefined as T`). The old path unconditionally `response.json()`'d which would throw on a no-content delete.
+  - `apps/web/app/employees/page.tsx` (new) — client component: list table, add-employee dialog, per-row dropdown with **"Sync to devices…"** and **"Delete"**, separate sync dialog with a checkbox list of devices (defaults to all selected).
+  - `apps/web/app/employees/layout.tsx` (new) — mirrors `DevicesLayout` (TopBar + TopNav + max-w-7xl main).
+  - `apps/web/components/top-nav.tsx` — added "Employees" between "Devices" and "Reports".
+  - `apps/web/package.json` — added `@testing-library/user-event` (devDep). Radix `DropdownMenu` uses pointer events; `fireEvent.click` on the trigger doesn't open it under jsdom. `user-event` simulates pointer events end-to-end.
+- **What's deliberately not in F22:**
+  - **Inline edit name / status** — deferred to F22-edit (or roll into F22 if/when the workflow demands it). Status change can already happen via a future PATCH dialog; no need to land it speculatively.
+  - **Delete confirm dialog.** Single click on "Delete" fires DELETE immediately. Real-world UX should have a confirm — captured as a followup. Kept simple to keep the test surface small.
+  - **Detail page `/employees/:id`** — devices got `/devices/:id/attendance`; employees don't need an equivalent yet because the list view + sync dialog handle the primary workflow.
+- **Sync dialog UX call:** opening the dialog pre-selects every registered device. **Why:** the most common operator action after enrolling someone is "push to all terminals". Deselect-to-exclude is a friendlier default than select-to-include for that pattern. Test exercises the default-on path; deselection paths are exercised manually for now.
+- **204 handling in `request<T>`:** small change with broad scope — every existing caller returns a body, so the short-circuit is unreachable for them. Worth knowing if anyone later adds a `void`-returning endpoint with a non-204 status.
+- **Walking skeleton is now usable through the browser for enrollment**: log in as admin → `/employees` → Add → Sync to devices → toast confirms per-device results.
 
 
 
