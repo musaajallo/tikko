@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { ProtectedShell } from "@/components/protected-shell";
 
-export default function DevicesLayout({
+export default function ReportsLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return <ProtectedShell>{children}</ProtectedShell>;
