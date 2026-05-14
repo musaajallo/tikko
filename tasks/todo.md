@@ -2,10 +2,11 @@
 
 ## Session end (2026-05-14)
 
-F01–F30 complete on `main`. F28 shipped JSON+CSV (XLSX deferred); F30 shipped enroll+verify+admin-login (recovery codes deferred to F30-recovery).
-- **api 190/190** · **web 20/20** · **shared-types 11/11** · **mobile 14/14** = 235 tests
-- `all-features.md` F20–F30 all ticked.
+F01–F31 complete on `main`.
+- **api 197/197** · **web 20/20** · **shared-types 11/11** · **mobile 14/14** = 242 tests
+- `all-features.md` F20–F31 all ticked. Only F32 (Docker Compose + VPS deploy) remains.
 - **Alembic migrations**: 4 total — `8c51c515c891` (initial), `598bccf9f7db` (leave_requests), `2823730c4ea4` (shift_rules), `b2d4cc7dbe00` (user_totp).
+- **Cloud mode is now enforced at boot**: lifespan calls `Settings.validate_for_deployment()`; misconfigured cloud deploys (default jwt secret, sqlite DB, default localhost CORS) fail fast with a combined error listing every issue.
 - **Schema management: Alembic.** Three migrations: `8c51c515c891` (initial), `598bccf9f7db` (leave_requests), `2823730c4ea4` (shift_rules). Live `tikko-dev.db` at head. New environments: `cd apps/api && uv run alembic upgrade head`. New model → register in `tikko.models.__init__`; `alembic/env.py` picks it up via `import tikko.models`.
 - **Known migration gotcha**: when autogenerate emits a new FK inside `batch_alter_table` (SQLite path), hand-edit the file to name the constraint — autogen emits `create_foreign_key(None, ...)` and SQLite's batch mode rejects it. Hit once during F26, documented in the done.md entry.
 
@@ -17,8 +18,7 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next
 
-- **F31** — Deploy mode config (`TIKKO_DEPLOY_MODE=lan|cloud` drives bindings/TLS/defaults; env validation at boot). Last item on the all-features hardening track besides F32.
-- **F32** — Docker Compose (LAN) + VPS deploy scripts/systemd units.
+- **F32** — Docker Compose (LAN) + VPS deploy scripts/systemd units. Last item on the all-features roadmap. After this, every roadmap feature is shipped.
 - **F30-recovery** (optional) — 10 single-use backup codes generated at enrollment; usable as `totp_code` during login; rotated by re-enrollment.
 - **F28-xlsx** (optional) — `openpyxl` + `.xlsx` endpoint.
 

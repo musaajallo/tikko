@@ -57,6 +57,41 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
+    def validate_for_deployment(self) -> None:
+        """Raise if the current settings are unsafe for the chosen deploy_mode.
+
+        LAN mode is permissive on purpose — that's the local-network deploy where
+        the defaults are fine. Cloud mode is where misconfiguration becomes a
+        production incident, so we surface every problem we know about in one
+        combined error rather than fail-fast on the first.
+        """
+        if self.deploy_mode != DeployMode.CLOUD:
+            return
+
+        problems: list[str] = []
+        if self.jwt_secret == "change-me":
+            problems.append(
+                "TIKKO_JWT_SECRET must be set to a real value in cloud mode "
+                "(generate with `openssl rand -hex 32`); the default 'change-me' "
+                "is rejected."
+            )
+        if "sqlite" in self.database_url.lower():
+            problems.append(
+                "TIKKO_DATABASE_URL must point at Postgres in cloud mode; "
+                "SQLite is only supported for local development."
+            )
+        if self.cors_origins == ["http://localhost:3000"]:
+            problems.append(
+                "TIKKO_CORS_ORIGINS must be set explicitly in cloud mode "
+                "(default localhost-only value is rejected)."
+            )
+
+        if problems:
+            joined = "\n  - ".join(problems)
+            raise ValueError(
+                f"invalid configuration for deploy_mode=cloud:\n  - {joined}"
+            )
+
 
 _settings: Settings | None = None
 

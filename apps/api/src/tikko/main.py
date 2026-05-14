@@ -46,6 +46,11 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     `TIKKO_CREATE_TABLES_ON_STARTUP=1` to skip migrations and build the schema
     in-memory via `Base.metadata.create_all` for speed.
     """
+    # Fail-fast at startup if the deploy mode contradicts the config. LAN mode
+    # is permissive (no-op); cloud mode raises on default-secret, sqlite DB,
+    # or default-localhost CORS.
+    get_settings().validate_for_deployment()
+
     if os.getenv("TIKKO_CREATE_TABLES_ON_STARTUP") == "1":
         engine = get_engine()
         async with engine.begin() as conn:

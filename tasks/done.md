@@ -392,3 +392,16 @@
 - **Plaintext secret-at-rest:** the `secret_b32` is stored unencrypted. Encryption-at-rest needs a KMS / wrapper-key story which is out of scope for F30; noted as a follow-up.
 - **F30-recovery scope:** 10 single-use backup codes generated at successful `/verify`, stored hashed, accepted as `totp_code` during login (consuming the row). Useful when the operator loses their phone.
 
+## F31 — Deploy-mode env validation at boot ✓
+- **Tests:** api 197/197 (7 new in `test_settings.py`), ruff clean. Live api smoke-tested (LAN default = no-op).
+- **Files:**
+  - `src/tikko/settings.py` — adds `Settings.validate_for_deployment()`. LAN mode is a no-op (permissive defaults are the point of LAN). Cloud mode raises one `ValueError` listing every problem it finds, so operators see the full failure list at startup instead of fixing one at a time.
+  - `src/tikko/main.py` — lifespan calls the validator before anything else (before `create_all`, before starting the poller). Misconfigured cloud deploys fail fast at startup rather than serving traffic with unsafe defaults.
+- **Rules enforced in cloud mode:**
+  - `TIKKO_JWT_SECRET` must not be the default `"change-me"` — would let anyone forge tokens.
+  - `TIKKO_DATABASE_URL` must not point at SQLite — fine for dev, wrong for any multi-process deploy.
+  - `TIKKO_CORS_ORIGINS` must not be the default `["http://localhost:3000"]` — a cloud deploy that still trusts localhost-only origins is misconfigured.
+- **Why one combined error and not raise on first match:** operators reading a startup log want the whole punch list at once. Three back-to-back boots to fix three problems is worse UX than one boot with three bullets.
+- **Why LAN stays permissive:** LAN is the "office network" deploy where the defaults are intentionally lenient (no TLS, localhost CORS, devices on private IPs). Tightening LAN would punish the dev workflow without adding safety.
+- **Tests covered:** LAN defaults pass; LAN with default `jwt_secret` still passes; cloud rejects each individual misconfig; cloud with all three set passes; cloud with all three wrong raises one error mentioning all three (operator-friendly).
+
