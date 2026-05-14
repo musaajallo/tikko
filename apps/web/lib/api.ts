@@ -23,7 +23,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  } catch {
+    throw new Error(
+      `Can't reach the API at ${baseUrl}. Is the server running?`,
+    );
+  }
   if (!response.ok) {
     // Expired or rejected session: drop the token and bounce to /login. We
     // do this for any 401 that isn't an actual auth call (so the login form
