@@ -345,7 +345,22 @@
   - **UTC-only for MVP.** The project already stores punches as UTC. Wall-clock-to-tz handling per organisation is a follow-up — adding it now without a real customer constraint risks the wrong abstraction.
 - **What F28 wires in:** read `Employee.shift_rule_id` → `ShiftRule`, pull the employee's attendance for a date range, group punches by `date()`, call `compute_day` per day, aggregate. CSV/XLSX export builds on the same daily metrics.
 
-
+## F28 — Report endpoints (JSON + CSV) ✓ (XLSX deferred to F28-xlsx)
+- **Tests:** api 178/178 (5 pure `compute_month` + 9 route tests across `test_payroll_month.py` + `test_reports.py`), ruff clean.
+- **Files:**
+  - `src/tikko/payroll/calc.py` — adds `MonthMetrics` + `compute_month(spec, punches, year, month) -> (list[DayMetrics], MonthMetrics)`. Iterates every calendar day in the month, calls `compute_day`, then aggregates. Counts only workday-with-punches in `days_worked` so weekend work doesn't masquerade as scheduled fulfilment.
+  - `src/tikko/payroll/__init__.py` — re-exports the new pieces.
+  - `src/tikko/schemas/report.py` (new) — `ReportEmployee`, `AttendanceReportDay` (no blob, ISO dates), `AttendanceReportTotals`, `AttendanceReport`.
+  - `src/tikko/routes/reports.py` (new) — `GET /reports/attendance` (JSON) and `GET /reports/attendance.csv` (`text/csv` + `Content-Disposition: attachment`). A shared `_load_report_context` resolves employee + rule + punches with consistent failure cases (404/422). `_rule_to_spec` adapts the ORM `ShiftRule` to the engine's `ShiftSpec`.
+  - `src/tikko/main.py` — registers `reports_router`.
+- **Failure cases match operator intent:**
+  - **404** if employee not found — caller has the wrong id.
+  - **422** if employee has no `shift_rule_id` — the report can't run without a rule; the operator must assign one first. (Not 404 because the employee *does* exist.)
+  - **422** if `month` doesn't match `YYYY-MM` — Pydantic-level pattern check at the route boundary.
+- **Why per-employee, not bulk:** F29's web UI will iterate per-employee anyway, and per-employee responses are cacheable + diffable. A bulk endpoint can come later if a real customer needs it.
+- **CSV shape:** header row + 1 row per calendar day (ISO date + booleans encoded as `1`/`0` for parser robustness) + a final `TOTAL` row. Filename is `attendance-<employee_code>-<month>.csv` via `Content-Disposition`, so a download saves with a meaningful name out of the box.
+- **XLSX deferred to F28-xlsx**: requires `openpyxl` and writes a workbook with a summary sheet + daily sheet. Skipping until someone asks — adds a non-trivial dep we don't yet have a justification for.
+- **Walking skeleton extends to reporting**: assign a shift rule to an employee → punch attendance → `GET /reports/attendance?employee_id=&month=YYYY-MM` returns daily + monthly metrics; `.csv` variant downloads.
 
 
 

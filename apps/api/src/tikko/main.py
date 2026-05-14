@@ -27,6 +27,7 @@ from tikko.routes.employees import router as employees_router
 from tikko.routes.iclock import router as iclock_router
 from tikko.routes.leave_requests import router as leave_requests_router
 from tikko.routes.me import router as me_router
+from tikko.routes.reports import router as reports_router
 from tikko.routes.shift_rules import router as shift_rules_router
 from tikko.routes.stats import router as stats_router
 from tikko.routes.ws import router as ws_router
@@ -87,6 +88,7 @@ app.include_router(employees_router)
 app.include_router(me_router)
 app.include_router(leave_requests_router)
 app.include_router(shift_rules_router)
+app.include_router(reports_router)
 app.include_router(stats_router)
 app.include_router(iclock_router)
 app.include_router(ws_router)

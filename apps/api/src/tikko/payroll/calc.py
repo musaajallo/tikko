@@ -18,6 +18,7 @@ Assumptions / scope (MVP):
 
 from __future__ import annotations
 
+import calendar
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time
@@ -117,3 +118,51 @@ def compute_day(
         early_out_minutes=early_out_minutes,
         overtime_minutes=overtime_minutes,
     )
+
+
+@dataclass(frozen=True)
+class MonthMetrics:
+    """Sums + counts across one calendar month for a single employee.
+
+    `days_worked` and `days_absent` only consider workdays. Weekend punches
+    add to `worked_minutes` but don't bump `days_worked`; that's a deliberate
+    choice so the report tells the operator "the employee filled their
+    scheduled days N times" rather than overloading the same counter with
+    voluntary weekend work.
+    """
+
+    year: int
+    month: int
+    days_worked: int
+    days_absent: int
+    worked_minutes: int
+    late_minutes: int
+    early_out_minutes: int
+    overtime_minutes: int
+
+
+def compute_month(
+    spec: ShiftSpec,
+    punches: Iterable[datetime],
+    year: int,
+    month: int,
+) -> tuple[list[DayMetrics], MonthMetrics]:
+    """Run `compute_day` across every calendar day in the month, then aggregate."""
+    materialized = list(punches)
+    _, last_day = calendar.monthrange(year, month)
+
+    days: list[DayMetrics] = []
+    for day in range(1, last_day + 1):
+        days.append(compute_day(spec, materialized, date(year, month, day)))
+
+    totals = MonthMetrics(
+        year=year,
+        month=month,
+        days_worked=sum(1 for d in days if d.is_workday and not d.is_absent),
+        days_absent=sum(1 for d in days if d.is_workday and d.is_absent),
+        worked_minutes=sum(d.worked_minutes for d in days),
+        late_minutes=sum(d.late_minutes for d in days),
+        early_out_minutes=sum(d.early_out_minutes for d in days),
+        overtime_minutes=sum(d.overtime_minutes for d in days),
+    )
+    return days, totals

@@ -5,6 +5,18 @@ unit-testable in isolation. F28 (report endpoints) is where DB rows are
 adapted into the engine's data classes.
 """
 
-from tikko.payroll.calc import DayMetrics, ShiftSpec, compute_day
+from tikko.payroll.calc import (
+    DayMetrics,
+    MonthMetrics,
+    ShiftSpec,
+    compute_day,
+    compute_month,
+)
 
-__all__ = ["DayMetrics", "ShiftSpec", "compute_day"]
+__all__ = [
+    "DayMetrics",
+    "MonthMetrics",
+    "ShiftSpec",
+    "compute_day",
+    "compute_month",
+]
