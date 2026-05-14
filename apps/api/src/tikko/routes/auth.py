@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pyotp
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -15,6 +16,7 @@ from tikko.auth import (
 from tikko.db import SessionDep
 from tikko.models.employee import Employee
 from tikko.models.user import User
+from tikko.models.user_totp import UserTOTP
 from tikko.schemas.employee import EmployeeRead
 from tikko.schemas.user import (
     AuthMeResponse,
@@ -84,6 +86,20 @@ async def login(payload: LoginPayload, session: SessionDep) -> TokenResponse:
     if user is None or not verify_password(payload.password, user.password_hash):
         # One error message for both branches — don't leak which side failed.
         raise HTTPException(status_code=401, detail="invalid credentials")
+
+    # Admin accounts gate on TOTP if enrolled + enabled. Non-admins can enrol
+    # but their login isn't blocked (per the F30 description: "TOTP for admin role").
+    if user.role == "admin":
+        totp = await session.get(UserTOTP, user.id)
+        if totp is not None and totp.enabled:
+            if payload.totp_code is None:
+                raise HTTPException(status_code=401, detail="totp_required")
+            # Same 1-step drift window as /auth/totp/verify keeps the door open
+            # when the client clock is slightly off.
+            if not pyotp.TOTP(totp.secret_b32).verify(
+                payload.totp_code, valid_window=1
+            ):
+                raise HTTPException(status_code=401, detail="invalid totp code")
 
     return TokenResponse(
         access_token=issue_access_token(user.id, user.role),

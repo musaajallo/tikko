@@ -33,6 +33,8 @@ class UserRead(BaseModel):
 class LoginPayload(BaseModel):
     email: EmailStr
     password: str
+    # Required only when the user is an admin with TOTP enabled. Six digits.
+    totp_code: str | None = Field(default=None, pattern=r"^\d{6}$")
 
 
 class TokenResponse(BaseModel):
