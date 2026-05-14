@@ -3,7 +3,7 @@
 import { Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,12 +19,26 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 
+const REMEMBER_EMAIL_KEY = "tikko.remembered_email";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill the email + tick "Remember me" if the user opted in last time.
+  // Lives in localStorage on purpose — survives tab restarts. Never stores
+  // the password.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(REMEMBER_EMAIL_KEY);
+    if (stored) {
+      setEmail(stored);
+      setRemember(true);
+    }
+  }, []);
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -33,6 +47,11 @@ export default function LoginPage() {
     try {
       const tokens = await api.login({ email, password });
       setToken(tokens.access_token, tokens.refresh_token);
+      if (remember) {
+        window.localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+      } else {
+        window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
+      }
       router.push("/devices");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -85,7 +104,11 @@ export default function LoginPage() {
               </div>
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox id="remember" />
+                  <Checkbox
+                    id="remember"
+                    checked={remember}
+                    onCheckedChange={(checked) => setRemember(checked === true)}
+                  />
                   <span>Remember me</span>
                 </label>
                 <span className="text-sm font-medium text-primary opacity-60">
