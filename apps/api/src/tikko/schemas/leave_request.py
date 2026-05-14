@@ -27,6 +27,12 @@ class LeaveRequestRead(BaseModel):
 
     id: str
     employee_id: str
+    # Denormalised for the manager UI so it doesn't need a second /employees
+    # round-trip to render names. Populated by the route via a LEFT JOIN; if
+    # the employee row was deleted between submission and decision the fields
+    # stay null.
+    employee_code: str | None = None
+    employee_full_name: str | None = None
     start_date: date
     end_date: date
     reason: str

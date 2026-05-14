@@ -267,3 +267,33 @@ def test_manager_can_decide(
         headers=_auth(manager_token),
     )
     assert response.status_code == 200
+
+
+def test_list_includes_employee_code_and_full_name(
+    client: TestClient, admin_auth: dict[str, str]
+) -> None:
+    """F25 enrichment — manager UI needs the employee name + code, not just the UUID."""
+    employee = _create_employee(client, admin_auth, code="1042", name="Ada Lovelace")
+    auth = _register_employee_user(client, "ada@example.com", employee["employee_code"])
+    _submit_leave(client, auth, reason="enrich check")
+
+    body = client.get("/leave-requests", headers=admin_auth).json()
+    [item] = body["items"]
+    assert item["employee_code"] == "1042"
+    assert item["employee_full_name"] == "Ada Lovelace"
+
+
+def test_patch_decision_returns_enriched_shape(
+    client: TestClient, admin_auth: dict[str, str]
+) -> None:
+    employee = _create_employee(client, admin_auth, code="1042", name="Ada Lovelace")
+    auth = _register_employee_user(client, "ada@example.com", employee["employee_code"])
+    leave = _submit_leave(client, auth)
+
+    body = client.patch(
+        f"/leave-requests/{leave['id']}/decision",
+        json={"decision": "approved"},
+        headers=admin_auth,
+    ).json()
+    assert body["employee_code"] == "1042"
+    assert body["employee_full_name"] == "Ada Lovelace"

@@ -303,6 +303,21 @@
 - **Lint note:** the `Query(...)` default for the `status` param tripped `B008`, while sibling `Query(1, ge=1)` did not. Ruff's FastAPI allowlist appears to require concrete (not `Union`) annotations to detect the marker, so the `status: LeaveStatus | None = Query(...)` line carries a `# noqa: B008` matching the pattern other routes already use implicitly. Worth revisiting if we switch the codebase to the `Annotated[..., Query(...)]` style.
 - **Walking skeleton now spans the leave workflow end-to-end**: employee submits via `POST /me/leave-requests` → manager sees it in `GET /leave-requests?status=pending` → manager decides via `PATCH /leave-requests/:id/decision` → employee sees the decision in their `GET /me/leave-requests` list.
 
+## F25 — Mobile manager approvals ✓ (closes `all-features.md` F25)
+- **Tests:** api 131/131 (2 new for the enriched response shape) · mobile 14/14 (4 new in `approvals.test.tsx`). Mobile stable across two consecutive runs.
+- **Backend enrich:**
+  - `LeaveRequestRead` gains `employee_code` + `employee_full_name` as nullable strings. Without these the manager UI would render UUIDs — useless. Nullable so old or orphaned requests still serialise (employee row could be deleted between submit and decision).
+  - `/leave-requests` GET joins `employees` once (`outerjoin`) and walks rows manually. PATCH-decision re-fetches the employee post-flush. Two small helpers — `_serialize_leave` in `routes/leave_requests.py` (joined-row form), `_serialize_leave_for_employee` in `routes/me.py` (already-resolved employee). Both reuse the same `LeaveRequestRead`.
+  - **Why no ORM `relationship` shortcut:** SQLAlchemy async + lazy-loaded relationships need careful eager-loading config and selectin tuning. The two manual joins are ~15 lines total and keep the route reading obvious — worth the duplication for now.
+- **Mobile screen:**
+  - `apps/mobile/lib/api.ts` — `LeaveRequest`/`LeaveRequestList` types, `listLeaveRequests(status?)`, `decideLeaveRequest(id, decision)`.
+  - `apps/mobile/app/approvals.tsx` (new) — fetches `?status=pending`, renders cards (`employee_full_name #employee_code`, date range, reason) with **Approve** and **Reject** buttons. On decide → PATCH then re-fetch so the decided row drops out of the list. Loading + error + empty states inline.
+  - `apps/mobile/app/feed.tsx` — adds an "Approvals" pill in the header. Admins/managers landing on `/feed` (because their User has no linked Employee) can reach the approvals queue in one tap.
+- **Why list refetch instead of in-place state mutation:** keeps the UI faithful to server state — if another manager decides the same request between fetch and tap, the next refetch will simply reflect that (the api 409s on the PATCH and we surface an Alert). Trade-off is one extra round trip per decision; for a single-user admin workflow that's fine.
+- **Out of scope:** sortable date column, batch approve, a web counterpart at `/leave-requests`. The web view would be a thin wrapper on the same endpoints — easy to add when needed.
+
+
+
 
 
 

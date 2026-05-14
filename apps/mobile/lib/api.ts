@@ -69,6 +69,27 @@ export interface AttendanceSummary {
   days_present: number;
 }
 
+export type LeaveStatus = "pending" | "approved" | "rejected";
+
+export interface LeaveRequest {
+  id: string;
+  employee_id: string;
+  employee_code: string | null;
+  employee_full_name: string | null;
+  start_date: string; // YYYY-MM-DD
+  end_date: string;
+  reason: string;
+  status: LeaveStatus;
+  created_at: string;
+  decided_at: string | null;
+  decided_by_user_id: string | null;
+}
+
+export interface LeaveRequestList {
+  items: LeaveRequest[];
+  total: number;
+}
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -85,4 +106,19 @@ export const api = {
 
   myMonthlySummary: (month: string) =>
     request<AttendanceSummary>(`/me/attendance/summary?month=${month}`),
+
+  listLeaveRequests: (status?: LeaveStatus, page = 1, pageSize = 50) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (status) params.set("status", status);
+    return request<LeaveRequestList>(`/leave-requests?${params.toString()}`);
+  },
+
+  decideLeaveRequest: (id: string, decision: "approved" | "rejected") =>
+    request<LeaveRequest>(`/leave-requests/${id}/decision`, {
+      method: "PATCH",
+      body: JSON.stringify({ decision }),
+    }),
 };

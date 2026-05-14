@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { getToken } from "@/lib/auth";
 
@@ -59,6 +59,13 @@ export default function Feed() {
       <View style={styles.header}>
         <Text style={styles.heading}>Live attendance</Text>
         <Text style={connected ? styles.dotOn : styles.dotOff}>●</Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => router.push("/approvals")}
+          style={styles.approvalsBtn}
+        >
+          <Text style={styles.approvalsText}>Approvals</Text>
+        </TouchableOpacity>
       </View>
 
       {events.length === 0 ? (
@@ -84,6 +91,14 @@ export default function Feed() {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 60, paddingHorizontal: 24, gap: 12 },
   header: { flexDirection: "row", alignItems: "center", gap: 8 },
+  approvalsBtn: {
+    marginLeft: "auto",
+    backgroundColor: "#e5e5e5",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  approvalsText: { fontSize: 13, fontWeight: "600", color: "#171717" },
   heading: { fontSize: 24, fontWeight: "700" },
   dotOn: { fontSize: 16, color: "#22c55e" },
   dotOff: { fontSize: 16, color: "#a3a3a3" },

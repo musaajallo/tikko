@@ -122,6 +122,25 @@ async def my_attendance_summary(
     )
 
 
+def _serialize_leave_for_employee(
+    leave: LeaveRequest, employee: Employee
+) -> LeaveRequestRead:
+    """`/me/*` always has the employee already loaded — no extra round trip."""
+    return LeaveRequestRead(
+        id=leave.id,
+        employee_id=leave.employee_id,
+        employee_code=employee.employee_code,
+        employee_full_name=employee.full_name,
+        start_date=leave.start_date,
+        end_date=leave.end_date,
+        reason=leave.reason,
+        status=leave.status,  # type: ignore[arg-type]
+        created_at=leave.created_at,
+        decided_at=leave.decided_at,
+        decided_by_user_id=leave.decided_by_user_id,
+    )
+
+
 @router.post(
     "/leave-requests",
     response_model=LeaveRequestRead,
@@ -131,7 +150,7 @@ async def submit_leave_request(
     payload: LeaveRequestCreate,
     session: SessionDep,
     current: CurrentUserDep,
-) -> LeaveRequest:
+) -> LeaveRequestRead:
     employee = await _linked_employee(session, current)
     leave = LeaveRequest(
         employee_id=employee.id,
@@ -142,7 +161,7 @@ async def submit_leave_request(
     )
     session.add(leave)
     await session.flush()
-    return leave
+    return _serialize_leave_for_employee(leave, employee)
 
 
 @router.get("/leave-requests", response_model=LeaveRequestList)
@@ -170,6 +189,6 @@ async def list_my_leave_requests(
         )
     ) or 0
     return LeaveRequestList(
-        items=[LeaveRequestRead.model_validate(item) for item in items],
+        items=[_serialize_leave_for_employee(item, employee) for item in items],
         total=total,
     )
