@@ -144,6 +144,40 @@ export interface TOTPEnrollResponse {
   enabled: boolean;
 }
 
+export interface UserListItem {
+  id: string;
+  email: string;
+  role: UserRole;
+  employee_id: string | null;
+  created_at: string;
+}
+
+export interface UserListResponse {
+  items: UserListItem[];
+  total: number;
+}
+
+export interface ShiftRule {
+  id: string;
+  name: string;
+  start_time: string; // HH:MM:SS
+  end_time: string;
+  late_grace_minutes: number;
+  early_out_grace_minutes: number;
+  overtime_threshold_minutes: number;
+  work_days: string; // 7-char binary, Mon..Sun
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShiftRuleList {
+  items: ShiftRule[];
+  total: number;
+}
+
+export type ShiftRuleCreate = Omit<ShiftRule, "id" | "created_at" | "updated_at">;
+export type ShiftRuleUpdate = Partial<ShiftRuleCreate>;
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -221,6 +255,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
+
+  listUsers: (page = 1, pageSize = 50) =>
+    request<UserListResponse>(`/users?page=${page}&page_size=${pageSize}`),
+
+  updateUserRole: (userId: string, role: UserRole) =>
+    request<UserListItem>(`/users/${userId}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+
+  listShiftRules: () => request<ShiftRuleList>("/shift-rules"),
+
+  createShiftRule: (input: ShiftRuleCreate) =>
+    request<ShiftRule>("/shift-rules", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateShiftRule: (id: string, input: ShiftRuleUpdate) =>
+    request<ShiftRule>(`/shift-rules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  deleteShiftRule: (id: string) =>
+    request<void>(`/shift-rules/${id}`, { method: "DELETE" }),
 
   // CSV download needs the bearer token, so a plain <a href> doesn't work.
   // We fetch as Blob and let the caller trigger a browser download.

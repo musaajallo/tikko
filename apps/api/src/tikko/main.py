@@ -32,6 +32,7 @@ from tikko.routes.reports import router as reports_router
 from tikko.routes.shift_rules import router as shift_rules_router
 from tikko.routes.stats import router as stats_router
 from tikko.routes.totp import router as totp_router
+from tikko.routes.users import router as users_router
 from tikko.routes.ws import router as ws_router
 from tikko.scheduler import run_poll_loop
 from tikko.settings import get_settings
@@ -91,6 +92,7 @@ def health() -> dict[str, str]:
 
 app.include_router(auth_router)
 app.include_router(totp_router)
+app.include_router(users_router)
 app.include_router(devices_router)
 app.include_router(employees_router)
 app.include_router(me_router)

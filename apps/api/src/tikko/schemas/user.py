@@ -42,6 +42,15 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=10, max_length=128)
 
 
+class UserList(BaseModel):
+    items: list[UserRead]
+    total: int
+
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
