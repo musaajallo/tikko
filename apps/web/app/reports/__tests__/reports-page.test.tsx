@@ -212,7 +212,7 @@ describe("Reports page", () => {
     fireEvent.change(screen.getByLabelText(/month/i), {
       target: { value: "2026-05" },
     });
-    await user.click(screen.getByRole("button", { name: /download csv/i }));
+    await user.click(screen.getByRole("button", { name: /^csv$/i }));
 
     await waitFor(() => {
       const csvCall = fetchMock.mock.calls.find((c) =>

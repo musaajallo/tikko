@@ -214,3 +214,34 @@ def test_report_csv_filename_header_includes_employee_and_month(
     assert "attachment" in cd
     assert "1042" in cd  # employee code
     assert "2026-05" in cd
+
+
+def test_report_xlsx_returns_workbook_with_two_sheets(
+    client: TestClient, admin_auth: dict[str, str]
+) -> None:
+    import io
+
+    from openpyxl import load_workbook
+
+    employee = _create_employee_with_rule(client, admin_auth)
+    response = client.get(
+        f"/reports/attendance.xlsx?employee_id={employee['id']}&month=2026-05",
+        headers=admin_auth,
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    cd = response.headers.get("content-disposition", "")
+    assert "1042" in cd
+    assert "2026-05" in cd
+
+    wb = load_workbook(io.BytesIO(response.content))
+    assert wb.sheetnames == ["Summary", "Daily"]
+    summary = wb["Summary"]
+    # Cell A1 holds the "Employee" label and B1 the name.
+    assert summary["A1"].value == "Employee"
+    assert "Ada Lovelace" in summary["B1"].value
+    # Daily sheet has header + 31 days = 32 rows for May.
+    daily = wb["Daily"]
+    assert daily.max_row == 32

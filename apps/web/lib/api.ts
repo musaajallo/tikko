@@ -297,19 +297,34 @@ export const api = {
     employeeId: string,
     month: string,
   ): Promise<{ blob: Blob; filename: string }> {
-    const token = getToken();
-    const url = `${baseUrl}/reports/attendance.csv?employee_id=${employeeId}&month=${month}`;
-    const response = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`${response.status} ${response.statusText} — ${text}`);
-    }
-    const blob = await response.blob();
-    const cd = response.headers.get("content-disposition") ?? "";
-    const match = /filename="?([^"]+)"?/i.exec(cd);
-    const filename = match?.[1] ?? `attendance-${month}.csv`;
-    return { blob, filename };
+    return downloadAttendanceBlob(employeeId, month, "csv");
+  },
+
+  async downloadAttendanceXlsx(
+    employeeId: string,
+    month: string,
+  ): Promise<{ blob: Blob; filename: string }> {
+    return downloadAttendanceBlob(employeeId, month, "xlsx");
   },
 };
+
+async function downloadAttendanceBlob(
+  employeeId: string,
+  month: string,
+  format: "csv" | "xlsx",
+): Promise<{ blob: Blob; filename: string }> {
+  const token = getToken();
+  const url = `${baseUrl}/reports/attendance.${format}?employee_id=${employeeId}&month=${month}`;
+  const response = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${response.statusText} — ${text}`);
+  }
+  const blob = await response.blob();
+  const cd = response.headers.get("content-disposition") ?? "";
+  const match = /filename="?([^"]+)"?/i.exec(cd);
+  const filename = match?.[1] ?? `attendance-${month}.${format}`;
+  return { blob, filename };
+}

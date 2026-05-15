@@ -96,27 +96,36 @@ export default function ReportsPage() {
     }
   }, [employeeId, month]);
 
-  const downloadCsv = useCallback(async () => {
-    if (!employeeId || !month) return;
-    setDownloading(true);
-    try {
-      const { blob, filename } = await api.downloadAttendanceCsv(employeeId, month);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      toast.error("Download failed", {
-        description: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setDownloading(false);
-    }
-  }, [employeeId, month]);
+  const triggerDownload = useCallback(
+    async (format: "csv" | "xlsx") => {
+      if (!employeeId || !month) return;
+      setDownloading(true);
+      try {
+        const { blob, filename } =
+          format === "csv"
+            ? await api.downloadAttendanceCsv(employeeId, month)
+            : await api.downloadAttendanceXlsx(employeeId, month);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        toast.error("Download failed", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        setDownloading(false);
+      }
+    },
+    [employeeId, month],
+  );
+
+  const downloadCsv = useCallback(() => triggerDownload("csv"), [triggerDownload]);
+  const downloadXlsx = useCallback(() => triggerDownload("xlsx"), [triggerDownload]);
 
   return (
     <div className="space-y-6">
@@ -141,7 +150,7 @@ export default function ReportsPage() {
               e.preventDefault();
               void runReport();
             }}
-            className="grid gap-4 md:grid-cols-[1fr_180px_auto_auto]"
+            className="grid gap-4 md:grid-cols-[1fr_180px_auto_auto_auto]"
           >
             <div className="grid gap-2">
               <Label htmlFor="employee">Employee</Label>
@@ -186,7 +195,18 @@ export default function ReportsPage() {
                 disabled={downloading || !employeeId}
               >
                 <Download className="mr-1 h-4 w-4" />
-                {downloading ? "Downloading…" : "Download CSV"}
+                CSV
+              </Button>
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={downloadXlsx}
+                disabled={downloading || !employeeId}
+              >
+                <Download className="mr-1 h-4 w-4" />
+                XLSX
               </Button>
             </div>
           </form>

@@ -202,3 +202,62 @@ async def attendance_report_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@router.get("/attendance.xlsx", dependencies=[_admin_or_manager])
+async def attendance_report_xlsx(
+    session: SessionDep,
+    employee_id: str = Query(..., description="Employee UUID"),
+    month: str = Query(..., pattern=_MONTH_PATTERN, description="YYYY-MM"),
+) -> Response:
+    # Local import keeps the openpyxl cost off the cold-start path for
+    # operators who only ever pull the JSON or CSV variants.
+    import io as _io
+
+    from openpyxl import Workbook
+
+    employee, rule, punches, year, month_num = await _load_report_context(
+        employee_id, month, session
+    )
+    days, totals = compute_month(_rule_to_spec(rule), punches, year, month_num)
+
+    wb = Workbook()
+
+    summary = wb.active
+    summary.title = "Summary"
+    summary.append(["Employee", f"{employee.full_name} (#{employee.employee_code})"])
+    summary.append(["Month", month])
+    summary.append([])
+    summary.append(["Days worked", totals.days_worked])
+    summary.append(["Days absent", totals.days_absent])
+    summary.append(["Worked minutes", totals.worked_minutes])
+    summary.append(["Late minutes", totals.late_minutes])
+    summary.append(["Early-out minutes", totals.early_out_minutes])
+    summary.append(["Overtime minutes", totals.overtime_minutes])
+
+    daily = wb.create_sheet("Daily")
+    daily.append(_CSV_HEADER)
+    for d in days:
+        daily.append(
+            [
+                d.date.isoformat(),
+                bool(d.is_workday),
+                bool(d.is_absent),
+                d.worked_minutes,
+                d.late_minutes,
+                d.early_out_minutes,
+                d.overtime_minutes,
+            ]
+        )
+
+    buf = _io.BytesIO()
+    wb.save(buf)
+    filename = f"attendance-{employee.employee_code}-{month}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type=_XLSX_MIME,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
