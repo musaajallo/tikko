@@ -32,6 +32,10 @@ class LeaveRequest(Base):
     employee_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("employees.id"), nullable=False, index=True
     )
+    # Nullable for back-compat: pre-F37 leave rows didn't carry a type.
+    leave_type_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("leave_types.id"), nullable=True, index=True
+    )
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)

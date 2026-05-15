@@ -14,6 +14,7 @@ class LeaveRequestCreate(BaseModel):
     start_date: date
     end_date: date
     reason: str = Field(..., min_length=1, max_length=500)
+    leave_type_id: str | None = None
 
     @model_validator(mode="after")
     def _start_before_or_equal_end(self) -> LeaveRequestCreate:
@@ -33,6 +34,8 @@ class LeaveRequestRead(BaseModel):
     # stay null.
     employee_code: str | None = None
     employee_full_name: str | None = None
+    leave_type_id: str | None = None
+    leave_type_name: str | None = None
     start_date: date
     end_date: date
     reason: str

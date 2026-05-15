@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Clock,
   Pencil,
+  Plane,
   Plus,
   Trash2,
   Users2,
@@ -46,6 +47,7 @@ import {
   api,
   type Department,
   type Holiday,
+  type LeaveType,
   type ShiftRule,
   type ShiftRuleCreate,
   type UserListItem,
@@ -81,6 +83,20 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+
+  // Leave types
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [leaveTypesLoading, setLeaveTypesLoading] = useState(true);
+  const [leaveTypeDialog, setLeaveTypeDialog] = useState<{
+    mode: "add" | "edit";
+    leaveType: LeaveType | null;
+  } | null>(null);
+  const [leaveTypeForm, setLeaveTypeForm] = useState<{
+    name: string;
+    days_per_year: number;
+    color: string;
+  }>({ name: "", days_per_year: 0, color: "" });
+  const [leaveTypeSubmitting, setLeaveTypeSubmitting] = useState(false);
 
   // Holidays
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -174,12 +190,33 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const refreshLeaveTypes = useCallback(async () => {
+    setLeaveTypesLoading(true);
+    try {
+      const { items } = await api.listLeaveTypes();
+      setLeaveTypes(items);
+    } catch (err) {
+      toast.error("Failed to load leave types", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setLeaveTypesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshUsers();
     void refreshRules();
     void refreshDepartments();
     void refreshHolidays();
-  }, [refreshUsers, refreshRules, refreshDepartments, refreshHolidays]);
+    void refreshLeaveTypes();
+  }, [
+    refreshUsers,
+    refreshRules,
+    refreshDepartments,
+    refreshHolidays,
+    refreshLeaveTypes,
+  ]);
 
   const changeRole = async (user: UserListItem, role: UserRole) => {
     if (role === user.role) return;
@@ -354,6 +391,68 @@ export default function SettingsPage() {
       });
     } finally {
       setHolidaySubmitting(false);
+    }
+  };
+
+  const openAddLeaveType = () => {
+    setLeaveTypeForm({ name: "", days_per_year: 0, color: "" });
+    setLeaveTypeDialog({ mode: "add", leaveType: null });
+  };
+
+  const openEditLeaveType = (lt: LeaveType) => {
+    setLeaveTypeForm({
+      name: lt.name,
+      days_per_year: lt.days_per_year,
+      color: lt.color ?? "",
+    });
+    setLeaveTypeDialog({ mode: "edit", leaveType: lt });
+  };
+
+  const closeLeaveTypeDialog = () => setLeaveTypeDialog(null);
+
+  const submitLeaveType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveTypeDialog) return;
+    setLeaveTypeSubmitting(true);
+    try {
+      const payload = {
+        name: leaveTypeForm.name,
+        days_per_year: leaveTypeForm.days_per_year,
+        color: leaveTypeForm.color.trim() || null,
+      };
+      if (leaveTypeDialog.mode === "add") {
+        await api.createLeaveType(payload);
+        toast.success(`Added ${leaveTypeForm.name}`);
+      } else if (leaveTypeDialog.leaveType) {
+        await api.updateLeaveType(leaveTypeDialog.leaveType.id, payload);
+        toast.success(`Updated ${leaveTypeForm.name}`);
+      }
+      closeLeaveTypeDialog();
+      await refreshLeaveTypes();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error("Could not save leave type", {
+        description: /409/.test(message)
+          ? "A leave type with that name already exists."
+          : message,
+      });
+    } finally {
+      setLeaveTypeSubmitting(false);
+    }
+  };
+
+  const deleteLeaveType = async (lt: LeaveType) => {
+    try {
+      await api.deleteLeaveType(lt.id);
+      toast.success(`Removed ${lt.name}`);
+      await refreshLeaveTypes();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error("Could not delete", {
+        description: /409/.test(message)
+          ? "Existing leave requests or balances still reference this type."
+          : message,
+      });
     }
   };
 
@@ -791,6 +890,167 @@ export default function SettingsPage() {
                         size="icon"
                         aria-label={`delete ${d.name}`}
                         onClick={() => void deleteDept(d)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* LEAVE TYPES SECTION */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-muted text-muted-foreground">
+              <Plane className="h-5 w-5" />
+            </span>
+            <div>
+              <CardTitle>Leave types</CardTitle>
+              <CardDescription>
+                Categories of leave (annual, sick, …). days_per_year is the
+                default allocation when a balance row is first created.
+              </CardDescription>
+            </div>
+          </div>
+          <Dialog
+            open={leaveTypeDialog !== null}
+            onOpenChange={(open) => !open && closeLeaveTypeDialog()}
+          >
+            <DialogTrigger asChild>
+              <Button onClick={openAddLeaveType}>
+                <Plus className="mr-1 h-4 w-4" /> Add leave type
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {leaveTypeDialog?.mode === "edit"
+                    ? "Edit leave type"
+                    : "Add leave type"}
+                </DialogTitle>
+                <DialogDescription>
+                  Name is unique. Days per year is the default allocation per
+                  employee per year.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={submitLeaveType} className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="lt_name">Name</Label>
+                  <Input
+                    id="lt_name"
+                    value={leaveTypeForm.name}
+                    onChange={(e) =>
+                      setLeaveTypeForm({ ...leaveTypeForm, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="lt_days">Days per year</Label>
+                    <Input
+                      id="lt_days"
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={leaveTypeForm.days_per_year}
+                      onChange={(e) =>
+                        setLeaveTypeForm({
+                          ...leaveTypeForm,
+                          days_per_year: Number(e.target.value) || 0,
+                        })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="lt_color">Color (optional)</Label>
+                    <Input
+                      id="lt_color"
+                      placeholder="#3b82f6"
+                      value={leaveTypeForm.color}
+                      onChange={(e) =>
+                        setLeaveTypeForm({
+                          ...leaveTypeForm,
+                          color: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeLeaveTypeDialog}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={leaveTypeSubmitting}>
+                    {leaveTypeSubmitting ? "Saving…" : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {leaveTypesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : leaveTypes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No leave types yet. Add one so requests can be categorised.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-[140px]">Days / year</TableHead>
+                  <TableHead className="w-[120px]">Color</TableHead>
+                  <TableHead className="w-[120px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leaveTypes.map((lt) => (
+                  <TableRow key={lt.id}>
+                    <TableCell className="font-medium">{lt.name}</TableCell>
+                    <TableCell>{lt.days_per_year}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {lt.color ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="inline-block h-3 w-3 rounded"
+                            style={{ backgroundColor: lt.color }}
+                          />
+                          {lt.color}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`edit ${lt.name}`}
+                        onClick={() => openEditLeaveType(lt)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`delete ${lt.name}`}
+                        onClick={() => void deleteLeaveType(lt)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

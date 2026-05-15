@@ -15,7 +15,9 @@ from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.email import leave_decided_email, send_email
 from tikko.models.employee import Employee
+from tikko.models.leave_balance import LeaveBalance
 from tikko.models.leave_request import LeaveRequest
+from tikko.models.leave_type import LeaveType
 from tikko.models.user import User
 from tikko.schemas.leave_request import (
     LeaveDecisionRequest,
@@ -29,6 +31,7 @@ def _serialize_leave(
     leave: LeaveRequest,
     employee_code: str | None,
     employee_full_name: str | None,
+    leave_type_name: str | None = None,
 ) -> LeaveRequestRead:
     """Build the wire shape from a (LeaveRequest, joined employee fields) row."""
     return LeaveRequestRead(
@@ -36,6 +39,8 @@ def _serialize_leave(
         employee_id=leave.employee_id,
         employee_code=employee_code,
         employee_full_name=employee_full_name,
+        leave_type_id=leave.leave_type_id,
+        leave_type_name=leave_type_name,
         start_date=leave.start_date,
         end_date=leave.end_date,
         reason=leave.reason,
@@ -62,8 +67,14 @@ async def list_leave_requests(
     ),
 ) -> LeaveRequestList:
     base = (
-        select(LeaveRequest, Employee.employee_code, Employee.full_name)
+        select(
+            LeaveRequest,
+            Employee.employee_code,
+            Employee.full_name,
+            LeaveType.name,
+        )
         .outerjoin(Employee, Employee.id == LeaveRequest.employee_id)
+        .outerjoin(LeaveType, LeaveType.id == LeaveRequest.leave_type_id)
     )
     count_base = select(func.count()).select_from(LeaveRequest)
     if status is not None:
@@ -79,7 +90,10 @@ async def list_leave_requests(
     total = (await session.scalar(count_base)) or 0
 
     return LeaveRequestList(
-        items=[_serialize_leave(leave, code, name) for leave, code, name in rows],
+        items=[
+            _serialize_leave(leave, code, name, type_name)
+            for leave, code, name, type_name in rows
+        ],
         total=total,
     )
 
@@ -108,6 +122,35 @@ async def decide_leave_request(
     leave.status = payload.decision
     leave.decided_at = datetime.now(UTC)
     leave.decided_by_user_id = current.id
+
+    # Consume balance on approve. Only when the request carries a leave_type_id —
+    # legacy rows submitted before F37 don't have one and we don't infer it.
+    if payload.decision == "approved" and leave.leave_type_id is not None:
+        days = (leave.end_date - leave.start_date).days + 1
+        year = leave.start_date.year
+        balance = await session.scalar(
+            select(LeaveBalance).where(
+                LeaveBalance.employee_id == leave.employee_id,
+                LeaveBalance.leave_type_id == leave.leave_type_id,
+                LeaveBalance.year == year,
+            )
+        )
+        if balance is None:
+            # Auto-create with the type's default allocation. Operators can
+            # adjust afterwards via PATCH /leave-balances/:id.
+            leave_type = await session.get(LeaveType, leave.leave_type_id)
+            allocated = leave_type.days_per_year if leave_type is not None else 0
+            balance = LeaveBalance(
+                employee_id=leave.employee_id,
+                leave_type_id=leave.leave_type_id,
+                year=year,
+                allocated_days=allocated,
+                used_days=days,
+            )
+            session.add(balance)
+        else:
+            balance.used_days += days
+
     await session.flush()
 
     employee = await session.get(Employee, leave.employee_id)
@@ -128,8 +171,13 @@ async def decide_leave_request(
                 send_email, to=submitter_email, subject=subject, html=html
             )
 
+    leave_type_name: str | None = None
+    if leave.leave_type_id is not None:
+        leave_type = await session.get(LeaveType, leave.leave_type_id)
+        leave_type_name = leave_type.name if leave_type else None
     return _serialize_leave(
         leave,
         employee.employee_code if employee else None,
         employee.full_name if employee else None,
+        leave_type_name=leave_type_name,
     )

@@ -7,7 +7,9 @@ from tikko.models.device import Device
 from tikko.models.employee import Employee
 from tikko.models.employee_template import EmployeeTemplate
 from tikko.models.holiday import Holiday
+from tikko.models.leave_balance import LeaveBalance
 from tikko.models.leave_request import LeaveRequest
+from tikko.models.leave_type import LeaveType
 from tikko.models.role_permission import RolePermission
 from tikko.models.shift_rule import ShiftRule
 from tikko.models.user import User
@@ -22,7 +24,9 @@ __all__ = [
     "Employee",
     "EmployeeTemplate",
     "Holiday",
+    "LeaveBalance",
     "LeaveRequest",
+    "LeaveType",
     "RolePermission",
     "ShiftRule",
     "User",

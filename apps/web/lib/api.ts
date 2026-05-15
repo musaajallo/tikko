@@ -244,6 +244,44 @@ export interface HolidayCreate {
 
 export type HolidayUpdate = Partial<HolidayCreate>;
 
+export interface LeaveType {
+  id: string;
+  name: string;
+  days_per_year: number;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeaveTypeList {
+  items: LeaveType[];
+  total: number;
+}
+
+export interface LeaveTypeCreate {
+  name: string;
+  days_per_year: number;
+  color?: string | null;
+}
+
+export type LeaveTypeUpdate = Partial<LeaveTypeCreate>;
+
+export interface LeaveBalance {
+  id: string;
+  employee_id: string;
+  leave_type_id: string;
+  year: number;
+  allocated_days: number;
+  used_days: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeaveBalanceList {
+  items: LeaveBalance[];
+  total: number;
+}
+
 export interface AuditEvent {
   id: string;
   actor_user_id: string | null;
@@ -417,6 +455,37 @@ export const api = {
     return request<AuditEventList>(`/audit-log${qs ? `?${qs}` : ""}`);
   },
 
+  listLeaveTypes: () => request<LeaveTypeList>("/leave-types"),
+
+  createLeaveType: (input: LeaveTypeCreate) =>
+    request<LeaveType>("/leave-types", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateLeaveType: (id: string, input: LeaveTypeUpdate) =>
+    request<LeaveType>(`/leave-types/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  deleteLeaveType: (id: string) =>
+    request<void>(`/leave-types/${id}`, { method: "DELETE" }),
+
+  listLeaveBalances: (params?: { employeeId?: string; year?: number }) => {
+    const sp = new URLSearchParams();
+    if (params?.employeeId) sp.set("employee_id", params.employeeId);
+    if (params?.year) sp.set("year", String(params.year));
+    const qs = sp.toString();
+    return request<LeaveBalanceList>(`/leave-balances${qs ? `?${qs}` : ""}`);
+  },
+
+  updateLeaveBalance: (id: string, allocatedDays: number) =>
+    request<LeaveBalance>(`/leave-balances/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ allocated_days: allocatedDays }),
+    }),
+
   listHolidays: (year?: number) =>
     request<HolidayList>(`/holidays${year ? `?year=${year}` : ""}`),
 
@@ -519,6 +588,8 @@ export const api = {
         employee_id: string;
         employee_code: string | null;
         employee_full_name: string | null;
+        leave_type_id: string | null;
+        leave_type_name: string | null;
         start_date: string;
         end_date: string;
         reason: string;

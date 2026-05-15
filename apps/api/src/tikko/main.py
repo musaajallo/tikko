@@ -20,7 +20,9 @@ from tikko.models import (  # noqa: F401 — register metadata
     Employee,
     EmployeeTemplate,
     Holiday,
+    LeaveBalance,
     LeaveRequest,
+    LeaveType,
     ShiftRule,
     User,
     UserTOTP,
@@ -34,6 +36,7 @@ from tikko.routes.employees import router as employees_router
 from tikko.routes.holidays import router as holidays_router
 from tikko.routes.iclock import router as iclock_router
 from tikko.routes.leave_requests import router as leave_requests_router
+from tikko.routes.leave_types import router as leave_types_router
 from tikko.routes.me import router as me_router
 from tikko.routes.permissions import router as permissions_router
 from tikko.routes.reports import router as reports_router
@@ -128,6 +131,7 @@ app.include_router(holidays_router)
 app.include_router(me_router)
 app.include_router(permissions_router)
 app.include_router(leave_requests_router)
+app.include_router(leave_types_router)
 app.include_router(shift_rules_router)
 app.include_router(reports_router)
 app.include_router(stats_router)

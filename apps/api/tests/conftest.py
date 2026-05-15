@@ -38,6 +38,8 @@ from tikko.models import (  # noqa: F401 — register models with Base.metadata
     Employee,
     EmployeeTemplate,
     Holiday,
+    LeaveBalance,
+    LeaveType,
     User,
 )
 

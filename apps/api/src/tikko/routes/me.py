@@ -19,6 +19,7 @@ from tikko.email import leave_submitted_email, send_email
 from tikko.models.attendance import AttendanceLog
 from tikko.models.employee import Employee
 from tikko.models.leave_request import LeaveRequest
+from tikko.models.leave_type import LeaveType
 from tikko.models.user import User
 from tikko.schemas.attendance import AttendanceLogList, AttendanceLogRead
 from tikko.schemas.leave_request import (
@@ -124,7 +125,9 @@ async def my_attendance_summary(
 
 
 def _serialize_leave_for_employee(
-    leave: LeaveRequest, employee: Employee
+    leave: LeaveRequest,
+    employee: Employee,
+    leave_type_name: str | None = None,
 ) -> LeaveRequestRead:
     """`/me/*` always has the employee already loaded — no extra round trip."""
     return LeaveRequestRead(
@@ -132,6 +135,8 @@ def _serialize_leave_for_employee(
         employee_id=leave.employee_id,
         employee_code=employee.employee_code,
         employee_full_name=employee.full_name,
+        leave_type_id=leave.leave_type_id,
+        leave_type_name=leave_type_name,
         start_date=leave.start_date,
         end_date=leave.end_date,
         reason=leave.reason,
@@ -154,8 +159,17 @@ async def submit_leave_request(
     background: BackgroundTasks,
 ) -> LeaveRequestRead:
     employee = await _linked_employee(session, current)
+
+    leave_type_name: str | None = None
+    if payload.leave_type_id is not None:
+        leave_type = await session.get(LeaveType, payload.leave_type_id)
+        if leave_type is None:
+            raise HTTPException(status_code=404, detail="leave_type not found")
+        leave_type_name = leave_type.name
+
     leave = LeaveRequest(
         employee_id=employee.id,
+        leave_type_id=payload.leave_type_id,
         start_date=payload.start_date,
         end_date=payload.end_date,
         reason=payload.reason,
@@ -190,7 +204,7 @@ async def submit_leave_request(
         for email in recipients:
             background.add_task(send_email, to=email, subject=subject, html=html)
 
-    return _serialize_leave_for_employee(leave, employee)
+    return _serialize_leave_for_employee(leave, employee, leave_type_name)
 
 
 @router.get("/leave-requests", response_model=LeaveRequestList)
@@ -203,13 +217,14 @@ async def list_my_leave_requests(
     employee = await _linked_employee(session, current)
     offset = (page - 1) * page_size
     stmt = (
-        select(LeaveRequest)
+        select(LeaveRequest, LeaveType.name)
+        .outerjoin(LeaveType, LeaveType.id == LeaveRequest.leave_type_id)
         .where(LeaveRequest.employee_id == employee.id)
         .order_by(LeaveRequest.created_at.desc())
         .offset(offset)
         .limit(page_size)
     )
-    items = (await session.execute(stmt)).scalars().all()
+    rows = (await session.execute(stmt)).all()
     total = (
         await session.scalar(
             select(func.count())
@@ -218,6 +233,9 @@ async def list_my_leave_requests(
         )
     ) or 0
     return LeaveRequestList(
-        items=[_serialize_leave_for_employee(item, employee) for item in items],
+        items=[
+            _serialize_leave_for_employee(item, employee, type_name)
+            for item, type_name in rows
+        ],
         total=total,
     )
