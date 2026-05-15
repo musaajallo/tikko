@@ -25,6 +25,7 @@ from tikko.models import (  # noqa: F401 — register metadata
     User,
     UserTOTP,
 )
+from tikko.routes.attendance import router as attendance_router
 from tikko.routes.audit import router as audit_router
 from tikko.routes.auth import router as auth_router
 from tikko.routes.departments import router as departments_router
@@ -118,6 +119,7 @@ def health() -> dict[str, str]:
 app.include_router(auth_router)
 app.include_router(totp_router)
 app.include_router(users_router)
+app.include_router(attendance_router)
 app.include_router(audit_router)
 app.include_router(departments_router)
 app.include_router(devices_router)

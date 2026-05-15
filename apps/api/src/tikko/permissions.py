@@ -30,6 +30,8 @@ Capability = Literal[
     # Holidays (F35)
     "view_holidays",
     "manage_holidays",
+    # Attendance corrections (F38)
+    "manage_attendance",
     # Leave (third-person manager view)
     "view_team_leave",
     "decide_leave",
@@ -66,6 +68,7 @@ DEFAULT_MATRIX: Final[dict[Role, frozenset[Capability]]] = {
             "view_employees",
             "view_departments",
             "view_holidays",
+            "manage_attendance",
             "view_team_leave",
             "decide_leave",
             "view_shift_rules",

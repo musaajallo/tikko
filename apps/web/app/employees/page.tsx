@@ -82,6 +82,12 @@ export default function EmployeesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  // Manual punch
+  const [punchTarget, setPunchTarget] = useState<Employee | null>(null);
+  const [punchDateTime, setPunchDateTime] = useState("");
+  const [punchNote, setPunchNote] = useState("");
+  const [punchSubmitting, setPunchSubmitting] = useState(false);
+
   // Bulk CSV import
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -175,6 +181,43 @@ export default function EmployeesPage() {
   const deptName = (id: string | null | undefined): string => {
     if (!id) return "—";
     return departments.find((d) => d.id === id)?.name ?? "—";
+  };
+
+  const openPunch = (employee: Employee) => {
+    setPunchTarget(employee);
+    // Default to "now" local-time, formatted for <input type="datetime-local">.
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setPunchDateTime(
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
+        now.getHours(),
+      )}:${pad(now.getMinutes())}`,
+    );
+    setPunchNote("");
+  };
+  const closePunch = () => setPunchTarget(null);
+
+  const onPunchSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!punchTarget) return;
+    setPunchSubmitting(true);
+    try {
+      // datetime-local gives a tz-naive local string; convert to ISO UTC.
+      const punchedAt = new Date(punchDateTime).toISOString();
+      await api.createManualPunch({
+        employee_id: punchTarget.id,
+        punched_at: punchedAt,
+        note: punchNote.trim() || null,
+      });
+      toast.success(`Added punch for ${punchTarget.full_name}`);
+      closePunch();
+    } catch (err) {
+      toast.error("Could not add manual punch", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setPunchSubmitting(false);
+    }
   };
 
   const openImport = () => {
@@ -404,6 +447,9 @@ export default function EmployeesPage() {
                           <DropdownMenuItem onClick={() => openSync(e)}>
                             Sync to devices…
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPunch(e)}>
+                            Add manual punch…
+                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <NextLink href={`/employees/${e.id}/templates`}>
                               Manage templates…
@@ -560,6 +606,50 @@ export default function EmployeesPage() {
               {deleteSubmitting ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={punchTarget !== null} onOpenChange={(open) => !open && closePunch()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Manual punch for {punchTarget?.full_name ?? ""}
+            </DialogTitle>
+            <DialogDescription>
+              Use this to fix a missed clock-in / clock-out. The row is stored
+              with source=manual and a null device_id so reports can tell it
+              apart from real terminal traffic.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onPunchSubmit} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="punch_datetime">Punched at</Label>
+              <Input
+                id="punch_datetime"
+                type="datetime-local"
+                value={punchDateTime}
+                onChange={(e) => setPunchDateTime(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="punch_note">Reason (optional)</Label>
+              <Input
+                id="punch_note"
+                value={punchNote}
+                onChange={(e) => setPunchNote(e.target.value)}
+                placeholder="e.g. terminal was offline at 8:30am"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closePunch}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={punchSubmitting || !punchDateTime}>
+                {punchSubmitting ? "Saving…" : "Save punch"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

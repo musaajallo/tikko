@@ -30,8 +30,9 @@ class AttendanceLog(Base):
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_uuid)
-    device_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True
+    # Nullable on purpose: F38 manual punches have no originating device.
+    device_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=True, index=True
     )
     device_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     punched_at: Mapped[datetime] = mapped_column(
@@ -39,6 +40,13 @@ class AttendanceLog(Base):
     )
     punch_type: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     verify_mode: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # "device" for real terminal punches, "manual" for operator corrections.
+    # Discriminates the two so reports / audit can tell them apart.
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="device"
+    )
+    # Free-text reason for manual punches. Stays null for device-sourced rows.
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

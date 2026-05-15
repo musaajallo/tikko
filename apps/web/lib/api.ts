@@ -325,6 +325,26 @@ export const api = {
       body: JSON.stringify({ device_ids: deviceIds }),
     }),
 
+  createManualPunch: (input: {
+    employee_id: string;
+    punched_at: string;
+    punch_type?: number;
+    note?: string | null;
+  }) =>
+    request<{
+      id: string;
+      device_id: string | null;
+      device_user_id: string;
+      punched_at: string;
+      punch_type: number;
+      verify_mode: number;
+      source: string;
+      note: string | null;
+    }>("/attendance/manual", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
   importEmployees: async (file: File): Promise<EmployeeImportResult> => {
     // Multipart needs a FormData body, which means we bypass the JSON request
     // helper and reconstruct only the bits we need (auth header, base URL).
