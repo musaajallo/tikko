@@ -35,10 +35,10 @@ type NavItem = {
 };
 
 const primary: NavItem[] = [
-  { href: "/devices" as Route, label: "Devices", requires: "view_devices" },
+  { href: "/reports" as Route, label: "Reports", requires: "view_reports" },
   { href: "/employees" as Route, label: "Employees", requires: "view_employees" },
   { href: "/leave-requests" as Route, label: "Leave", requires: "view_team_leave" },
-  { href: "/reports" as Route, label: "Reports", requires: "view_reports" },
+  { href: "/devices" as Route, label: "Devices", requires: "view_devices" },
   { href: "/settings" as Route, label: "Settings", requires: "manage_permissions" },
 ];
 
