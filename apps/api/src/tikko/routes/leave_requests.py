@@ -8,13 +8,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from sqlalchemy import func, select
 
 from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
+from tikko.email import leave_decided_email, send_email
 from tikko.models.employee import Employee
 from tikko.models.leave_request import LeaveRequest
+from tikko.models.user import User
 from tikko.schemas.leave_request import (
     LeaveDecisionRequest,
     LeaveRequestList,
@@ -92,6 +94,7 @@ async def decide_leave_request(
     payload: LeaveDecisionRequest,
     session: SessionDep,
     current: CurrentUserDep,
+    background: BackgroundTasks,
 ) -> LeaveRequestRead:
     leave = await session.get(LeaveRequest, leave_id)
     if leave is None:
@@ -108,6 +111,23 @@ async def decide_leave_request(
     await session.flush()
 
     employee = await session.get(Employee, leave.employee_id)
+
+    # Notify the user who submitted the request (if their account exists +
+    # they're the one linked to this employee).
+    if employee is not None:
+        submitter_email = await session.scalar(
+            select(User.email).where(User.employee_id == employee.id)
+        )
+        if submitter_email:
+            subject, html = leave_decided_email(
+                decision=payload.decision,
+                start_date=leave.start_date.isoformat(),
+                end_date=leave.end_date.isoformat(),
+            )
+            background.add_task(
+                send_email, to=submitter_email, subject=subject, html=html
+            )
+
     return _serialize_leave(
         leave,
         employee.employee_code if employee else None,

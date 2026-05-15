@@ -10,11 +10,12 @@ import hashlib
 import secrets
 
 import pyotp
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from sqlalchemy import delete
 
 from tikko.auth import CurrentUserDep, verify_password
 from tikko.db import SessionDep
+from tikko.email import send_email, totp_toggled_email
 from tikko.models.user import User
 from tikko.models.user_totp import UserTOTP
 from tikko.models.user_totp_recovery_code import UserTOTPRecoveryCode
@@ -109,6 +110,7 @@ async def verify_totp(
     payload: TOTPVerifyRequest,
     session: SessionDep,
     current: CurrentUserDep,
+    background: BackgroundTasks,
 ) -> TOTPVerifyResponse:
     record = await session.get(UserTOTP, current.id)
     if record is None:
@@ -132,6 +134,13 @@ async def verify_totp(
     # If the user calls /verify again (idempotent OK), they don't get fresh codes.
     if first_time:
         codes = await _replace_recovery_codes(session, current.id)
+        # Notify the user that 2FA is now active — important security event.
+        user = await session.get(User, current.id)
+        if user is not None:
+            subject, html = totp_toggled_email(enabled=True)
+            background.add_task(
+                send_email, to=user.email, subject=subject, html=html
+            )
     else:
         codes = []
     return TOTPVerifyResponse(enabled=True, recovery_codes=codes)
@@ -142,6 +151,7 @@ async def disable_totp(
     payload: TOTPDisableRequest,
     session: SessionDep,
     current: CurrentUserDep,
+    background: BackgroundTasks,
 ) -> Response:
     user = await session.get(User, current.id)
     if user is None:
@@ -161,6 +171,10 @@ async def disable_totp(
         )
     )
     await session.flush()
+
+    subject, html = totp_toggled_email(enabled=False)
+    background.add_task(send_email, to=user.email, subject=subject, html=html)
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

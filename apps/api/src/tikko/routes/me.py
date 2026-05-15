@@ -10,11 +10,12 @@ from __future__ import annotations
 import calendar
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from sqlalchemy import func, select
 
 from tikko.auth import CurrentUserDep
 from tikko.db import SessionDep
+from tikko.email import leave_submitted_email, send_email
 from tikko.models.attendance import AttendanceLog
 from tikko.models.employee import Employee
 from tikko.models.leave_request import LeaveRequest
@@ -150,6 +151,7 @@ async def submit_leave_request(
     payload: LeaveRequestCreate,
     session: SessionDep,
     current: CurrentUserDep,
+    background: BackgroundTasks,
 ) -> LeaveRequestRead:
     employee = await _linked_employee(session, current)
     leave = LeaveRequest(
@@ -161,6 +163,33 @@ async def submit_leave_request(
     )
     session.add(leave)
     await session.flush()
+
+    # Notify everyone with the `decide_leave` capability. Resolved at request
+    # time so role/capability edits take effect on the next submission.
+    from tikko.models.role_permission import RolePermission
+
+    notify_roles = (
+        await session.execute(
+            select(RolePermission.role).where(
+                RolePermission.capability == "decide_leave"
+            )
+        )
+    ).scalars().all()
+    if notify_roles:
+        recipients = (
+            await session.execute(
+                select(User.email).where(User.role.in_(list(notify_roles)))
+            )
+        ).scalars().all()
+        subject, html = leave_submitted_email(
+            employee_name=employee.full_name,
+            start_date=payload.start_date.isoformat(),
+            end_date=payload.end_date.isoformat(),
+            reason=payload.reason,
+        )
+        for email in recipients:
+            background.add_task(send_email, to=email, subject=subject, html=html)
+
     return _serialize_leave_for_employee(leave, employee)
 
 

@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     log_level: str = "info"
 
+    # Resend email integration. When `resend_api_key` is empty, the email
+    # module logs sends and skips the HTTP call — keeps dev environments
+    # from accidentally emailing real users.
+    resend_api_key: str = ""
+    from_email: str = "no-reply@tikko.local"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_csv_origins(cls, value: object) -> object:

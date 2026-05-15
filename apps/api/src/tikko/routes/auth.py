@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pyotp
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from sqlalchemy import select
 
 from tikko.auth import (
@@ -17,6 +17,7 @@ from tikko.auth import (
     verify_password,
 )
 from tikko.db import SessionDep
+from tikko.email import password_changed_email, send_email, welcome_email
 from tikko.models.employee import Employee
 from tikko.models.user import User
 from tikko.models.user_totp import UserTOTP
@@ -36,7 +37,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, session: SessionDep) -> User:
+async def register(
+    payload: UserCreate,
+    session: SessionDep,
+    background: BackgroundTasks,
+) -> User:
     existing = await session.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(status_code=409, detail="email already registered")
@@ -61,6 +66,10 @@ async def register(payload: UserCreate, session: SessionDep) -> User:
     )
     session.add(user)
     await session.flush()
+
+    subject, html = welcome_email(email=user.email, role=user.role)
+    background.add_task(send_email, to=user.email, subject=subject, html=html)
+
     return user
 
 
@@ -138,6 +147,7 @@ async def change_password(
     payload: ChangePasswordRequest,
     session: SessionDep,
     current: CurrentUserDep,
+    background: BackgroundTasks,
 ) -> Response:
     user = await session.get(User, current.id)
     if user is None:
@@ -148,4 +158,8 @@ async def change_password(
 
     user.password_hash = hash_password(payload.new_password)
     await session.flush()
+
+    subject, html = password_changed_email(email=user.email)
+    background.add_task(send_email, to=user.email, subject=subject, html=html)
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
