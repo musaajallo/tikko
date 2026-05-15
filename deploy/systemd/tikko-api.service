@@ -1,0 +1,37 @@
+; Sample systemd unit for running the tikko api on a VPS without docker.
+;
+; Drop into /etc/systemd/system/, then:
+;   systemctl daemon-reload
+;   systemctl enable --now tikko-api
+;
+; Assumes:
+;   - source checked out at /opt/tikko
+;   - python 3.12 + uv installed
+;   - environment file at /etc/tikko/api.env (chown root:tikko, chmod 640)
+
+[Unit]
+Description=tikko api
+Documentation=https://github.com/yourorg/tikko
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tikko
+Group=tikko
+WorkingDirectory=/opt/tikko/apps/api
+EnvironmentFile=/etc/tikko/api.env
+ExecStartPre=/usr/local/bin/uv run alembic upgrade head
+ExecStart=/usr/local/bin/uv run uvicorn tikko.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5s
+
+; Hardening — minimum useful set for an internet-facing service.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/tikko/apps/api
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,37 @@
+; Sample systemd unit for running the tikko web app on a VPS without docker.
+;
+; Drop into /etc/systemd/system/, then:
+;   systemctl daemon-reload
+;   systemctl enable --now tikko-web
+;
+; Assumes:
+;   - source checked out at /opt/tikko
+;   - node 20 + pnpm installed
+;   - build already produced (.next/standalone) via `pnpm --filter @tikko/web build`
+;   - environment file at /etc/tikko/web.env (chown root:tikko, chmod 640)
+
+[Unit]
+Description=tikko web
+Documentation=https://github.com/yourorg/tikko
+After=network-online.target tikko-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tikko
+Group=tikko
+WorkingDirectory=/opt/tikko
+EnvironmentFile=/etc/tikko/web.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/node apps/web/.next/standalone/apps/web/server.js
+Restart=on-failure
+RestartSec=5s
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

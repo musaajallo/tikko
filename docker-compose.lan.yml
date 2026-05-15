@@ -1,0 +1,63 @@
+# tikko — LAN deploy. Postgres + api + web on a single host.
+#
+# Usage:
+#   cp .env.example .env && edit it
+#   docker compose -f docker-compose.lan.yml --env-file .env up -d --build
+#   docker compose -f docker-compose.lan.yml run --rm api uv run alembic upgrade head
+#
+# For cloud deploys see deploy/README.md — same images, different orchestration.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tikko
+      POSTGRES_PASSWORD: tikko
+      POSTGRES_DB: tikko
+    volumes:
+      - tikko-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tikko -d tikko"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Bind to localhost only — devices and clients reach the DB through the api,
+    # not directly. Comment out for ops-team admin access on the LAN.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TIKKO_DEPLOY_MODE: ${TIKKO_DEPLOY_MODE:-lan}
+      TIKKO_DATABASE_URL: postgresql+psycopg://tikko:tikko@postgres:5432/tikko
+      TIKKO_JWT_SECRET: ${TIKKO_JWT_SECRET:-change-me}
+      TIKKO_CORS_ORIGINS: ${TIKKO_CORS_ORIGINS:-http://localhost:3000}
+      TIKKO_LOG_LEVEL: ${TIKKO_LOG_LEVEL:-info}
+    ports:
+      # On LAN, bind to all interfaces so ZK devices on the network can hit
+      # the ADMS push endpoint. For cloud, prefer a reverse proxy in front.
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the client bundle at build time.
+        NEXT_PUBLIC_TIKKO_API_BASE_URL: ${NEXT_PUBLIC_TIKKO_API_BASE_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  tikko-postgres:
