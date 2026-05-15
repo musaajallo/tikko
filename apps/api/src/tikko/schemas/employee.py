@@ -51,6 +51,23 @@ class EmployeeList(BaseModel):
     total: int
 
 
+class EmployeeImportRowResult(BaseModel):
+    """Outcome of a single CSV row in a bulk import."""
+
+    row: int  # 1-based, 1 = first data row (header is row 0)
+    status: Literal["created", "skipped", "failed"]
+    employee_id: str | None = None
+    employee_code: str | None = None
+    error: str | None = None
+
+
+class EmployeeImportResult(BaseModel):
+    created: int
+    skipped: int
+    failed: int
+    rows: list[EmployeeImportRowResult]
+
+
 class EmployeeSyncRequest(BaseModel):
     device_ids: list[str] = Field(..., min_length=1)
 

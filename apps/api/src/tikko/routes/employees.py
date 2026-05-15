@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -29,6 +31,8 @@ def _emp_snapshot(emp: Employee) -> dict[str, object | None]:
     }
 from tikko.schemas.employee import (
     EmployeeCreate,
+    EmployeeImportResult,
+    EmployeeImportRowResult,
     EmployeeList,
     EmployeeRead,
     EmployeeSyncEntry,
@@ -417,4 +421,203 @@ async def list_templates(employee_id: str, session: SessionDep) -> TemplateList:
     return TemplateList(
         items=[TemplateRead.model_validate(item) for item in items],
         total=len(items),
+    )
+
+
+_IMPORT_REQUIRED = ("employee_code", "full_name")
+_IMPORT_OPTIONAL = ("status", "department_id", "department_name")
+_IMPORT_MAX_BYTES = 2 * 1024 * 1024  # 2 MiB ceiling — generous for thousands of rows
+
+
+@router.post(
+    "/import",
+    response_model=EmployeeImportResult,
+    dependencies=[_manage_employees],
+)
+async def import_employees(
+    session: SessionDep,
+    current: CurrentUserDep,
+    file: UploadFile = File(..., description="CSV with employee_code,full_name[,status][,department_id|department_name]"),
+) -> EmployeeImportResult:
+    """Bulk-create employees from a CSV upload.
+
+    The CSV must have a header row. Required columns: employee_code, full_name.
+    Optional: status (active/inactive/terminated), and either department_id (UUID)
+    or department_name (looked up case-insensitively). Unknown extra columns are
+    ignored so operators can keep their own bookkeeping fields in the same file.
+
+    Each row is processed independently — one failure does not stop the rest.
+    Returns a per-row outcome so the UI can render success / skip / error in
+    place.
+    """
+    raw = await file.read()
+    if len(raw) > _IMPORT_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"CSV exceeds {_IMPORT_MAX_BYTES} bytes",
+        )
+    try:
+        text = raw.decode("utf-8-sig")  # tolerate Excel BOM
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="CSV must be UTF-8 encoded",
+        ) from exc
+
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="CSV is empty",
+        )
+    missing = [c for c in _IMPORT_REQUIRED if c not in reader.fieldnames]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"missing required column(s): {', '.join(missing)}",
+        )
+
+    # Build a lowercase-name -> id lookup once so per-row dept resolution is O(1).
+    dept_rows = (await session.execute(select(Department))).scalars().all()
+    dept_by_name = {d.name.strip().lower(): d.id for d in dept_rows}
+    dept_ids = {d.id for d in dept_rows}
+
+    rows: list[EmployeeImportRowResult] = []
+    created = skipped = failed = 0
+
+    for row_num, raw_row in enumerate(reader, start=1):
+        # Strip every value so trailing newlines / Excel padding don't leak in.
+        row = {k: (v.strip() if isinstance(v, str) else v) for k, v in raw_row.items()}
+        code = row.get("employee_code") or ""
+        name = row.get("full_name") or ""
+
+        if not code or not name:
+            failed += 1
+            rows.append(
+                EmployeeImportRowResult(
+                    row=row_num,
+                    status="failed",
+                    employee_code=code or None,
+                    error="employee_code and full_name are required",
+                )
+            )
+            continue
+        if not code.isdigit():
+            failed += 1
+            rows.append(
+                EmployeeImportRowResult(
+                    row=row_num,
+                    status="failed",
+                    employee_code=code,
+                    error="employee_code must be digits only",
+                )
+            )
+            continue
+
+        status_value = (row.get("status") or "active").lower()
+        if status_value not in {"active", "inactive", "terminated"}:
+            failed += 1
+            rows.append(
+                EmployeeImportRowResult(
+                    row=row_num,
+                    status="failed",
+                    employee_code=code,
+                    error=f"unknown status {status_value!r}",
+                )
+            )
+            continue
+
+        # Resolve department: id takes precedence over name when both supplied.
+        dept_id: str | None = None
+        raw_dept_id = row.get("department_id")
+        raw_dept_name = row.get("department_name")
+        if raw_dept_id:
+            if raw_dept_id not in dept_ids:
+                failed += 1
+                rows.append(
+                    EmployeeImportRowResult(
+                        row=row_num,
+                        status="failed",
+                        employee_code=code,
+                        error=f"unknown department_id {raw_dept_id}",
+                    )
+                )
+                continue
+            dept_id = raw_dept_id
+        elif raw_dept_name:
+            resolved = dept_by_name.get(raw_dept_name.lower())
+            if resolved is None:
+                failed += 1
+                rows.append(
+                    EmployeeImportRowResult(
+                        row=row_num,
+                        status="failed",
+                        employee_code=code,
+                        error=f"unknown department_name {raw_dept_name!r}",
+                    )
+                )
+                continue
+            dept_id = resolved
+
+        # Skip-on-duplicate — operators re-running an import shouldn't see a
+        # wall of red. The dedupe key is employee_code (unique in the DB).
+        existing = await session.scalar(
+            select(Employee).where(Employee.employee_code == code)
+        )
+        if existing is not None:
+            skipped += 1
+            rows.append(
+                EmployeeImportRowResult(
+                    row=row_num,
+                    status="skipped",
+                    employee_id=existing.id,
+                    employee_code=code,
+                    error="employee_code already exists",
+                )
+            )
+            continue
+
+        employee = Employee(
+            employee_code=code,
+            full_name=name,
+            status=status_value,
+            department_id=dept_id,
+        )
+        session.add(employee)
+        try:
+            await session.flush()
+        except IntegrityError:
+            # A race against another concurrent import or a duplicate later in
+            # the same file — recover by rolling the row back and skipping.
+            await session.rollback()
+            failed += 1
+            rows.append(
+                EmployeeImportRowResult(
+                    row=row_num,
+                    status="failed",
+                    employee_code=code,
+                    error="conflict on insert",
+                )
+            )
+            continue
+        await log_audit(
+            session,
+            actor=current,
+            action="create_employee",
+            resource_type="employee",
+            resource_id=employee.id,
+            after=_emp_snapshot(employee),
+        )
+        created += 1
+        rows.append(
+            EmployeeImportRowResult(
+                row=row_num,
+                status="created",
+                employee_id=employee.id,
+                employee_code=code,
+            )
+        )
+
+    return EmployeeImportResult(
+        created=created, skipped=skipped, failed=failed, rows=rows
     )

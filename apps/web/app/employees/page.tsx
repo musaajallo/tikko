@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, Plus, Users } from "lucide-react";
+import { MoreHorizontal, Plus, Upload, Users } from "lucide-react";
 import NextLink from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -42,7 +42,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { api, type Department } from "@/lib/api";
+import {
+  api,
+  type Department,
+  type EmployeeImportResult,
+} from "@/lib/api";
 import type { Device, Employee, EmployeeSyncEntry } from "@tikko/shared-types";
 
 const STATUS_VARIANT: Record<Employee["status"], "default" | "secondary" | "destructive"> = {
@@ -77,6 +81,14 @@ export default function EmployeesPage() {
   // Delete confirm dialog
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // Bulk CSV import
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [importResult, setImportResult] = useState<EmployeeImportResult | null>(
+    null,
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -165,6 +177,38 @@ export default function EmployeesPage() {
     return departments.find((d) => d.id === id)?.name ?? "—";
   };
 
+  const openImport = () => {
+    setImportFile(null);
+    setImportResult(null);
+    setImportOpen(true);
+  };
+
+  const closeImport = () => {
+    setImportOpen(false);
+    setImportFile(null);
+    setImportResult(null);
+  };
+
+  const onImportSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!importFile) return;
+    setImportSubmitting(true);
+    try {
+      const result = await api.importEmployees(importFile);
+      setImportResult(result);
+      toast.success(
+        `Imported ${result.created} of ${result.created + result.skipped + result.failed} rows`,
+      );
+      await refresh();
+    } catch (err) {
+      toast.error("Import failed", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setImportSubmitting(false);
+    }
+  };
+
   const onConfirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleteSubmitting(true);
@@ -234,6 +278,10 @@ export default function EmployeesPage() {
               People who can punch in on a registered terminal.
             </CardDescription>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={openImport}>
+              <Upload className="mr-1 h-4 w-4" /> Import CSV
+            </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -295,6 +343,7 @@ export default function EmployeesPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -511,6 +560,103 @@ export default function EmployeesPage() {
               {deleteSubmitting ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={(open) => !open && closeImport()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import employees from CSV</DialogTitle>
+            <DialogDescription>
+              Required columns: <code>employee_code</code>, <code>full_name</code>.
+              Optional: <code>status</code> (active / inactive / terminated),
+              <code> department_id</code> or <code>department_name</code>. Existing{" "}
+              <code>employee_code</code> values are skipped.
+            </DialogDescription>
+          </DialogHeader>
+
+          {importResult === null ? (
+            <form onSubmit={onImportSubmit} className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="import_file">CSV file</Label>
+                <Input
+                  id="import_file"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeImport}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={importSubmitting || !importFile}>
+                  {importSubmitting ? "Importing…" : "Import"}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-md border p-3">
+                  <div className="text-xs uppercase text-muted-foreground">Created</div>
+                  <div className="text-2xl font-semibold">{importResult.created}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs uppercase text-muted-foreground">Skipped</div>
+                  <div className="text-2xl font-semibold">{importResult.skipped}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs uppercase text-muted-foreground">Failed</div>
+                  <div className="text-2xl font-semibold text-destructive">
+                    {importResult.failed}
+                  </div>
+                </div>
+              </div>
+              {importResult.rows.some((r) => r.status !== "created") && (
+                <div className="max-h-[260px] overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[60px]">Row</TableHead>
+                        <TableHead className="w-[100px]">Code</TableHead>
+                        <TableHead className="w-[100px]">Status</TableHead>
+                        <TableHead>Detail</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importResult.rows
+                        .filter((r) => r.status !== "created")
+                        .map((r) => (
+                          <TableRow key={r.row}>
+                            <TableCell className="font-mono text-xs">{r.row}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {r.employee_code ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  r.status === "failed" ? "destructive" : "secondary"
+                                }
+                              >
+                                {r.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {r.error ?? "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <DialogFooter>
+                <Button onClick={closeImport}>Done</Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

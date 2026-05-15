@@ -95,6 +95,21 @@ export interface EmployeeSyncResult {
   results: EmployeeSyncEntry[];
 }
 
+export interface EmployeeImportRowResult {
+  row: number;
+  status: "created" | "skipped" | "failed";
+  employee_id: string | null;
+  employee_code: string | null;
+  error: string | null;
+}
+
+export interface EmployeeImportResult {
+  created: number;
+  skipped: number;
+  failed: number;
+  rows: EmployeeImportRowResult[];
+}
+
 export interface AttendanceReportDay {
   date: string; // YYYY-MM-DD
   is_workday: boolean;
@@ -309,6 +324,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ device_ids: deviceIds }),
     }),
+
+  importEmployees: async (file: File): Promise<EmployeeImportResult> => {
+    // Multipart needs a FormData body, which means we bypass the JSON request
+    // helper and reconstruct only the bits we need (auth header, base URL).
+    const token = getToken();
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${baseUrl}/employees/import`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: form,
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`${response.status} ${response.statusText} — ${text}`);
+    }
+    return response.json() as Promise<EmployeeImportResult>;
+  },
 
   attendanceReport: (employeeId: string, month: string) =>
     request<AttendanceReport>(
