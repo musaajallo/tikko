@@ -1,8 +1,14 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { api, type AttendanceLog, type AttendanceSummary, type EmployeeMe } from "@/lib/api";
+import {
+  api,
+  type AttendanceLog,
+  type AttendanceSummary,
+  type EmployeeMe,
+  type LeaveRequest,
+} from "@/lib/api";
 
 function currentMonth(): string {
   const now = new Date();
@@ -25,10 +31,28 @@ function formatPunchedAt(iso: string): string {
   }
 }
 
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso + "T00:00:00Z").toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+const LEAVE_STATUS_COLOR: Record<LeaveRequest["status"], string> = {
+  pending: "#a16207",
+  approved: "#15803d",
+  rejected: "#b91c1c",
+};
+
 export default function Dashboard() {
   const [employee, setEmployee] = useState<EmployeeMe | null>(null);
   const [summary, setSummary] = useState<AttendanceSummary | null>(null);
   const [punches, setPunches] = useState<AttendanceLog[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,13 +69,15 @@ export default function Dashboard() {
         }
         setEmployee(me.employee);
 
-        const [s, list] = await Promise.all([
+        const [s, list, leaveList] = await Promise.all([
           api.myMonthlySummary(currentMonth()),
           api.listMyAttendance(1, 20),
+          api.listMyLeaveRequests(1, 10),
         ]);
         if (cancelled) return;
         setSummary(s);
         setPunches(list.items);
+        setLeaves(leaveList.items);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : String(err));
@@ -86,7 +112,7 @@ export default function Dashboard() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
         <Text style={styles.heading}>{employee.full_name}</Text>
         <Text style={styles.code}>#{employee.employee_code}</Text>
@@ -109,18 +135,35 @@ export default function Dashboard() {
       {punches.length === 0 ? (
         <Text style={styles.empty}>No punches yet this period.</Text>
       ) : (
-        <FlatList
-          data={punches}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <Text style={styles.userId}>{item.device_user_id}</Text>
-              <Text style={styles.time}>{formatPunchedAt(item.punched_at)}</Text>
-            </View>
-          )}
-        />
+        punches.map((item) => (
+          <View key={item.id} style={styles.row}>
+            <Text style={styles.userId}>{item.device_user_id}</Text>
+            <Text style={styles.time}>{formatPunchedAt(item.punched_at)}</Text>
+          </View>
+        ))
       )}
-    </View>
+
+      <Text style={styles.section}>My leave requests</Text>
+      {leaves.length === 0 ? (
+        <Text style={styles.empty}>No leave requests yet.</Text>
+      ) : (
+        leaves.map((item) => (
+          <View key={item.id} style={styles.row}>
+            <View style={styles.leaveLeft}>
+              <Text style={styles.leaveReason}>{item.reason}</Text>
+              <Text style={styles.time}>
+                {formatDate(item.start_date)} – {formatDate(item.end_date)}
+              </Text>
+            </View>
+            <Text
+              style={[styles.leaveStatus, { color: LEAVE_STATUS_COLOR[item.status] }]}
+            >
+              {item.status}
+            </Text>
+          </View>
+        ))
+      )}
+    </ScrollView>
   );
 }
 
@@ -152,4 +195,11 @@ const styles = StyleSheet.create({
   },
   userId: { fontSize: 16, fontWeight: "600" },
   time: { fontSize: 13, color: "#525252" },
+  leaveLeft: { flex: 1, gap: 2 },
+  leaveReason: { fontSize: 14, fontWeight: "600" },
+  leaveStatus: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
 });

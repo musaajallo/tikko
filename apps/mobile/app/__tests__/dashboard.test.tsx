@@ -72,6 +72,10 @@ describe("Mobile dashboard", () => {
         },
       },
       {
+        url: /\/me\/leave-requests/,
+        resp: { ok: true, json: async () => ({ items: [], total: 0 }) },
+      },
+      {
         url: /\/me\/attendance/,
         resp: {
           ok: true,
@@ -109,6 +113,56 @@ describe("Mobile dashboard", () => {
     });
     // Two recent punches rendered.
     expect(screen.getAllByText("1042")).toHaveLength(2);
+  });
+
+  it("renders the user's leave requests with status", async () => {
+    (global as { fetch: unknown }).fetch = routeFetch([
+      { url: /\/auth\/me/, resp: ME_LINKED },
+      {
+        url: /\/me\/attendance\/summary/,
+        resp: {
+          ok: true,
+          json: async () => ({
+            month: "2026-05",
+            total_punches: 0,
+            days_present: 0,
+          }),
+        },
+      },
+      {
+        url: /\/me\/leave-requests/,
+        resp: {
+          ok: true,
+          json: async () => ({
+            items: [
+              {
+                id: "lr-1",
+                employee_id: "e1",
+                employee_code: "1042",
+                employee_full_name: "Ada Lovelace",
+                start_date: "2026-06-01",
+                end_date: "2026-06-03",
+                reason: "Family visit",
+                status: "approved",
+                created_at: "2026-05-14T08:00:00Z",
+                decided_at: "2026-05-14T09:00:00Z",
+                decided_by_user_id: "u-admin",
+              },
+            ],
+            total: 1,
+          }),
+        },
+      },
+      {
+        url: /\/me\/attendance/,
+        resp: { ok: true, json: async () => ({ items: [], total: 0 }) },
+      },
+    ]);
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText(/Family visit/)).toBeTruthy();
+    expect(screen.getByText(/approved/i)).toBeTruthy();
   });
 
   it("redirects to /feed when the user has no linked employee", async () => {

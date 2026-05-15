@@ -121,4 +121,9 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ decision }),
     }),
+
+  listMyLeaveRequests: (page = 1, pageSize = 20) =>
+    request<LeaveRequestList>(
+      `/me/leave-requests?page=${page}&page_size=${pageSize}`,
+    ),
 };
