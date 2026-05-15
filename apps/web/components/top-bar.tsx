@@ -43,7 +43,7 @@ const primary: NavItem[] = [
 ];
 
 const secondary: NavItem[] = [
-  { href: "/documentation" as Route, label: "Docs", soon: true, requires: null },
+  { href: "/documentation" as Route, label: "Docs", requires: null },
 ];
 
 function avatarInitials(email?: string | null): string {
