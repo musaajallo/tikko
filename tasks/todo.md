@@ -2,9 +2,9 @@
 
 ## Session end (2026-05-14)
 
-F01–F31 complete on `main`, plus a user profile page (`/profile`) and a real settings page (`/settings`).
-- **api 210/210** · **web 28/28** · **shared-types 11/11** · **mobile 14/14** = 263 tests
-- `all-features.md` F20–F31 all ticked. Only F32 (Docker Compose + VPS deploy) remains.
+**F01–F32 complete on `main` — every roadmap feature shipped.** Plus a profile page, real settings page, employee leave list on mobile, web leave-requests page, web templates page, TOTP recovery codes, XLSX export, Remember-me persistence, edit-employee dialog, delete-confirm dialog.
+- **api 218/218** · **web 33/33** · **shared-types 11/11** · **mobile 15/15** = 277 tests
+- `all-features.md` F01–F32 all ticked. No roadmap items left.
 - **Alembic migrations**: 4 total — `8c51c515c891` (initial), `598bccf9f7db` (leave_requests), `2823730c4ea4` (shift_rules), `b2d4cc7dbe00` (user_totp).
 - **Cloud mode is now enforced at boot**: lifespan calls `Settings.validate_for_deployment()`; misconfigured cloud deploys (default jwt secret, sqlite DB, default localhost CORS) fail fast with a combined error listing every issue.
 - **Known migration gotcha**: when autogenerate emits a new FK inside `batch_alter_table` (SQLite path), hand-edit the file to name the constraint — autogen emits `create_foreign_key(None, ...)` and SQLite's batch mode rejects it. Hit once during F26, documented in the done.md entry.
@@ -17,22 +17,11 @@ in-process pyzk harness for tests + hardware-free dev.
 
 ## Up next — roadmap
 
-- **F32** — Docker Compose (LAN) + VPS deploy scripts/systemd units. Last item on `all-features.md`.
+_All roadmap features shipped — nothing pending._
 
 ## Optional features
 
-UI gaps in shipped backend features:
-
-- **Web `/leave-requests` admin page** — only the mobile F25 screen exists; managers approving from the browser have no UI today.
-- **Web `/employees/:id/templates` page** — no UI for the F21 pull/push backend.
-- **Employee-facing leave list on the mobile dashboard** — the dashboard shows attendance KPIs but not the user's own leave requests.
-
-Smaller follow-ups to shipped features:
-
-- **F22-edit** — inline edit employee name + status from the row (PATCH `/employees/:id`).
-- **F22-delete-confirm** — confirm dialog before the row "Delete" actually deletes.
-- **F30-recovery** — TOTP backup codes (10 single-use codes generated at `/verify`, usable as `totp_code` during login, rotated by re-enrollment).
-- **F28-xlsx** — `openpyxl` + `.xlsx` endpoint that mirrors the CSV export.
+_All optional UI gaps and follow-ups from the prior list are also shipped (F30-recovery, F28-xlsx, web leave-requests, web templates, employee leave on mobile, F22-edit, F22-delete-confirm)._
 
 ## Followups (not features)
 

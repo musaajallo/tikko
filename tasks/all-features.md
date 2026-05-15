@@ -82,4 +82,4 @@
 - [x] F30 — TOTP for admin role (enrollment, verification, recovery codes)  <!-- recovery codes deferred to F30-recovery -->
 
 - [x] F31 — Deploy mode config (`TIKKO_DEPLOY_MODE` switches binding, TLS, defaults; env validation at boot)
-- [ ] F32 — Docker Compose (LAN) + VPS deploy scripts/systemd units
+- [x] F32 — Docker Compose (LAN) + VPS deploy scripts/systemd units
