@@ -98,6 +98,7 @@ export interface EmployeeSyncResult {
 export interface AttendanceReportDay {
   date: string; // YYYY-MM-DD
   is_workday: boolean;
+  is_holiday?: boolean;
   is_absent: boolean;
   first_in: string | null;
   last_out: string | null;
@@ -110,6 +111,7 @@ export interface AttendanceReportDay {
 export interface AttendanceReportTotals {
   days_worked: number;
   days_absent: number;
+  days_holiday?: number;
   worked_minutes: number;
   late_minutes: number;
   early_out_minutes: number;
@@ -206,6 +208,26 @@ export interface DepartmentCreate {
 }
 
 export type DepartmentUpdate = Partial<DepartmentCreate>;
+
+export interface Holiday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HolidayList {
+  items: Holiday[];
+  total: number;
+}
+
+export interface HolidayCreate {
+  date: string; // YYYY-MM-DD
+  name: string;
+}
+
+export type HolidayUpdate = Partial<HolidayCreate>;
 
 export interface AuditEvent {
   id: string;
@@ -341,6 +363,24 @@ export const api = {
     const qs = sp.toString();
     return request<AuditEventList>(`/audit-log${qs ? `?${qs}` : ""}`);
   },
+
+  listHolidays: (year?: number) =>
+    request<HolidayList>(`/holidays${year ? `?year=${year}` : ""}`),
+
+  createHoliday: (input: HolidayCreate) =>
+    request<Holiday>("/holidays", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateHoliday: (id: string, input: HolidayUpdate) =>
+    request<Holiday>(`/holidays/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  deleteHoliday: (id: string) =>
+    request<void>(`/holidays/${id}`, { method: "DELETE" }),
 
   listDepartments: () => request<DepartmentList>("/departments"),
 

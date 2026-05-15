@@ -37,6 +37,7 @@ from tikko.models import (  # noqa: F401 — register models with Base.metadata
     Device,
     Employee,
     EmployeeTemplate,
+    Holiday,
     User,
 )
 

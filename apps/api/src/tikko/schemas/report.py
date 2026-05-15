@@ -16,6 +16,7 @@ class ReportEmployee(BaseModel):
 class AttendanceReportDay(BaseModel):
     date: date
     is_workday: bool
+    is_holiday: bool = False
     is_absent: bool
     first_in: datetime | None = None
     last_out: datetime | None = None
@@ -28,6 +29,7 @@ class AttendanceReportDay(BaseModel):
 class AttendanceReportTotals(BaseModel):
     days_worked: int
     days_absent: int
+    days_holiday: int = 0
     worked_minutes: int
     late_minutes: int
     early_out_minutes: int

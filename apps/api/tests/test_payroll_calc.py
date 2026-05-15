@@ -222,3 +222,43 @@ def test_punches_outside_target_date_are_ignored() -> None:
     metrics = compute_day(NINE_TO_FIVE, punches, THURSDAY)
     assert metrics.last_out == _at(THURSDAY, 17, 0)
     assert metrics.worked_minutes == 8 * 60
+
+
+def test_holiday_on_workday_suppresses_late_early_absent() -> None:
+    # THURSDAY is a workday but marked a holiday: no punches → not absent.
+    spec = ShiftSpec(
+        start_time=time(9, 0),
+        end_time=time(17, 0),
+        work_days="1111100",
+        holidays=frozenset({THURSDAY}),
+    )
+    metrics = compute_day(spec, [], THURSDAY)
+    assert metrics.is_workday is True
+    assert metrics.is_holiday is True
+    assert metrics.is_absent is False
+    assert metrics.late_minutes == 0
+    assert metrics.early_out_minutes == 0
+
+
+def test_holiday_still_records_overtime_when_present() -> None:
+    # Working the holiday: 9 to 18:30 should still flag OT past the threshold.
+    spec = ShiftSpec(
+        start_time=time(9, 0),
+        end_time=time(17, 0),
+        overtime_threshold_minutes=30,
+        work_days="1111100",
+        holidays=frozenset({THURSDAY}),
+    )
+    metrics = compute_day(
+        spec,
+        [_at(THURSDAY, 9, 0), _at(THURSDAY, 18, 30)],
+        THURSDAY,
+    )
+    assert metrics.is_holiday is True
+    assert metrics.is_absent is False
+    # 90 min after scheduled end, threshold 30 → OT = 60.
+    assert metrics.overtime_minutes == 60
+    # Late + early still suppressed by the holiday.
+    assert metrics.late_minutes == 0
+    assert metrics.early_out_minutes == 0
+

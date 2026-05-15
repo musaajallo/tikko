@@ -1,6 +1,14 @@
 "use client";
 
-import { Building2, Clock, Pencil, Plus, Trash2, Users2 } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  Clock,
+  Pencil,
+  Plus,
+  Trash2,
+  Users2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -37,6 +45,7 @@ import { PermissionsMatrix } from "@/components/permissions-matrix";
 import {
   api,
   type Department,
+  type Holiday,
   type ShiftRule,
   type ShiftRuleCreate,
   type UserListItem,
@@ -72,6 +81,19 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+
+  // Holidays
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidaysLoading, setHolidaysLoading] = useState(true);
+  const [holidayDialog, setHolidayDialog] = useState<{
+    mode: "add" | "edit";
+    holiday: Holiday | null;
+  } | null>(null);
+  const [holidayForm, setHolidayForm] = useState<{ date: string; name: string }>({
+    date: "",
+    name: "",
+  });
+  const [holidaySubmitting, setHolidaySubmitting] = useState(false);
 
   // Departments
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -138,11 +160,26 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const refreshHolidays = useCallback(async () => {
+    setHolidaysLoading(true);
+    try {
+      const { items } = await api.listHolidays();
+      setHolidays(items);
+    } catch (err) {
+      toast.error("Failed to load holidays", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setHolidaysLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshUsers();
     void refreshRules();
     void refreshDepartments();
-  }, [refreshUsers, refreshRules, refreshDepartments]);
+    void refreshHolidays();
+  }, [refreshUsers, refreshRules, refreshDepartments, refreshHolidays]);
 
   const changeRole = async (user: UserListItem, role: UserRole) => {
     if (role === user.role) return;
@@ -280,6 +317,56 @@ export default function SettingsPage() {
   const deptName = (id: string | null): string => {
     if (id === null) return "—";
     return departments.find((d) => d.id === id)?.name ?? "—";
+  };
+
+  const openAddHoliday = () => {
+    setHolidayForm({ date: "", name: "" });
+    setHolidayDialog({ mode: "add", holiday: null });
+  };
+
+  const openEditHoliday = (holiday: Holiday) => {
+    setHolidayForm({ date: holiday.date, name: holiday.name });
+    setHolidayDialog({ mode: "edit", holiday });
+  };
+
+  const closeHolidayDialog = () => setHolidayDialog(null);
+
+  const submitHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holidayDialog) return;
+    setHolidaySubmitting(true);
+    try {
+      if (holidayDialog.mode === "add") {
+        await api.createHoliday(holidayForm);
+        toast.success(`Added ${holidayForm.name}`);
+      } else if (holidayDialog.holiday) {
+        await api.updateHoliday(holidayDialog.holiday.id, holidayForm);
+        toast.success(`Updated ${holidayForm.name}`);
+      }
+      closeHolidayDialog();
+      await refreshHolidays();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error("Could not save holiday", {
+        description: /409/.test(message)
+          ? "A holiday already exists on that date."
+          : message,
+      });
+    } finally {
+      setHolidaySubmitting(false);
+    }
+  };
+
+  const deleteHoliday = async (holiday: Holiday) => {
+    try {
+      await api.deleteHoliday(holiday.id);
+      toast.success(`Removed ${holiday.name}`);
+      await refreshHolidays();
+    } catch (err) {
+      toast.error("Could not delete", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
   const toggleWorkDay = (index: number) => {
@@ -704,6 +791,131 @@ export default function SettingsPage() {
                         size="icon"
                         aria-label={`delete ${d.name}`}
                         onClick={() => void deleteDept(d)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* HOLIDAYS SECTION */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-muted text-muted-foreground">
+              <CalendarDays className="h-5 w-5" />
+            </span>
+            <div>
+              <CardTitle>Holidays</CardTitle>
+              <CardDescription>
+                Calendar dates that skip late / early / absent in payroll
+                reports. OT still applies on holidays worked.
+              </CardDescription>
+            </div>
+          </div>
+          <Dialog
+            open={holidayDialog !== null}
+            onOpenChange={(open) => !open && closeHolidayDialog()}
+          >
+            <DialogTrigger asChild>
+              <Button onClick={openAddHoliday}>
+                <Plus className="mr-1 h-4 w-4" /> Add holiday
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {holidayDialog?.mode === "edit" ? "Edit holiday" : "Add holiday"}
+                </DialogTitle>
+                <DialogDescription>
+                  Each calendar date is unique. Name is for display in reports.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={submitHoliday} className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="holiday_date">Date</Label>
+                  <Input
+                    id="holiday_date"
+                    type="date"
+                    value={holidayForm.date}
+                    onChange={(e) =>
+                      setHolidayForm({ ...holidayForm, date: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="holiday_name">Name</Label>
+                  <Input
+                    id="holiday_name"
+                    value={holidayForm.name}
+                    onChange={(e) =>
+                      setHolidayForm({ ...holidayForm, name: e.target.value })
+                    }
+                    placeholder="e.g. Christmas Day"
+                    required
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeHolidayDialog}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={holidaySubmitting}>
+                    {holidaySubmitting ? "Saving…" : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {holidaysLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : holidays.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No holidays configured. Add one to mark a calendar day as off
+              for payroll.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[140px]">Date</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-[120px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {holidays.map((h) => (
+                  <TableRow key={h.id}>
+                    <TableCell className="font-mono text-xs">{h.date}</TableCell>
+                    <TableCell className="font-medium">{h.name}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`edit ${h.name}`}
+                        onClick={() => openEditHoliday(h)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`delete ${h.name}`}
+                        onClick={() => void deleteHoliday(h)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

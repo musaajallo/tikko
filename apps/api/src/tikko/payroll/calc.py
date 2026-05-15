@@ -35,6 +35,11 @@ class ShiftSpec:
     overtime_threshold_minutes: int = 30
     # 7-char binary string indexed Monday..Sunday. "1111100" = Mon-Fri.
     work_days: str = "1111100"
+    # F35 holiday calendar. A date in this set turns off late/early/absent
+    # accounting (the employee isn't expected to be present on that day) but
+    # overtime is still computed — operators want to see "she worked the
+    # holiday, so she's owed OT on it".
+    holidays: frozenset[date] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ class DayMetrics:
 
     date: date
     is_workday: bool
+    is_holiday: bool
     is_absent: bool
     first_in: datetime | None
     last_out: datetime | None
@@ -67,6 +73,10 @@ def compute_day(
     on_date: date,
 ) -> DayMetrics:
     is_workday = _is_workday(spec.work_days, on_date)
+    is_holiday = on_date in spec.holidays
+    # A holiday short-circuits the "absent on a workday" rule — the employee
+    # is off the hook for the day even if it falls on Mon-Fri.
+    counts_as_workday = is_workday and not is_holiday
 
     # Filter to punches that fall on `on_date` (UTC), then sort.
     same_day = sorted(p for p in punches if p.date() == on_date)
@@ -75,7 +85,8 @@ def compute_day(
         return DayMetrics(
             date=on_date,
             is_workday=is_workday,
-            is_absent=is_workday,
+            is_holiday=is_holiday,
+            is_absent=counts_as_workday,
             first_in=None,
             last_out=None,
             worked_minutes=0,
@@ -95,12 +106,12 @@ def compute_day(
     scheduled_end = datetime.combine(on_date, spec.end_time, tzinfo=tz)
 
     late_overage = _minutes_between(scheduled_start, first_in) - spec.late_grace_minutes
-    late_minutes = max(0, late_overage) if is_workday else 0
+    late_minutes = max(0, late_overage) if counts_as_workday else 0
 
     early_overage = (
         _minutes_between(last_out, scheduled_end) - spec.early_out_grace_minutes
     )
-    early_out_minutes = max(0, early_overage) if is_workday else 0
+    early_out_minutes = max(0, early_overage) if counts_as_workday else 0
 
     ot_overage = (
         _minutes_between(scheduled_end, last_out) - spec.overtime_threshold_minutes
@@ -110,6 +121,7 @@ def compute_day(
     return DayMetrics(
         date=on_date,
         is_workday=is_workday,
+        is_holiday=is_holiday,
         is_absent=False,
         first_in=first_in,
         last_out=last_out,
@@ -129,12 +141,16 @@ class MonthMetrics:
     choice so the report tells the operator "the employee filled their
     scheduled days N times" rather than overloading the same counter with
     voluntary weekend work.
+
+    `days_holiday` counts holidays that fell on what would otherwise have
+    been workdays — the days the employee got off thanks to the calendar.
     """
 
     year: int
     month: int
     days_worked: int
     days_absent: int
+    days_holiday: int
     worked_minutes: int
     late_minutes: int
     early_out_minutes: int
@@ -158,8 +174,11 @@ def compute_month(
     totals = MonthMetrics(
         year=year,
         month=month,
-        days_worked=sum(1 for d in days if d.is_workday and not d.is_absent),
+        days_worked=sum(
+            1 for d in days if d.is_workday and not d.is_holiday and not d.is_absent
+        ),
         days_absent=sum(1 for d in days if d.is_workday and d.is_absent),
+        days_holiday=sum(1 for d in days if d.is_workday and d.is_holiday),
         worked_minutes=sum(d.worked_minutes for d in days),
         late_minutes=sum(d.late_minutes for d in days),
         early_out_minutes=sum(d.early_out_minutes for d in days),

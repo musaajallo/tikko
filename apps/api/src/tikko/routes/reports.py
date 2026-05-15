@@ -20,6 +20,7 @@ from tikko.auth import require_capability
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.employee import Employee
+from tikko.models.holiday import Holiday
 from tikko.models.shift_rule import ShiftRule
 from tikko.payroll import ShiftSpec, compute_month
 from tikko.schemas.report import (
@@ -39,8 +40,8 @@ _MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 async def _load_report_context(
     employee_id: str, month: str, session: SessionDep
-) -> tuple[Employee, ShiftRule, list[datetime], int, int]:
-    """Resolve employee + rule + punches for the requested month, or raise.
+) -> tuple[Employee, ShiftRule, list[datetime], frozenset, int, int]:
+    """Resolve employee + rule + punches + holidays for the month, or raise.
 
     Shared by JSON and CSV endpoints so the failure cases stay consistent.
     """
@@ -82,10 +83,21 @@ async def _load_report_context(
     ).all()
     punches = [r[0] for r in rows]
 
-    return employee, rule, punches, year, month_num
+    # Pull only the holidays that fall in this month so compute_day can flag them.
+    holiday_rows = (
+        await session.execute(
+            select(Holiday.date).where(
+                Holiday.date >= start.date(),
+                Holiday.date < end.date(),
+            )
+        )
+    ).all()
+    holidays = frozenset(r[0] for r in holiday_rows)
+
+    return employee, rule, punches, holidays, year, month_num
 
 
-def _rule_to_spec(rule: ShiftRule) -> ShiftSpec:
+def _rule_to_spec(rule: ShiftRule, holidays: frozenset) -> ShiftSpec:
     return ShiftSpec(
         start_time=rule.start_time,
         end_time=rule.end_time,
@@ -93,6 +105,7 @@ def _rule_to_spec(rule: ShiftRule) -> ShiftSpec:
         early_out_grace_minutes=rule.early_out_grace_minutes,
         overtime_threshold_minutes=rule.overtime_threshold_minutes,
         work_days=rule.work_days,
+        holidays=holidays,
     )
 
 
@@ -106,10 +119,12 @@ async def attendance_report(
     employee_id: str = Query(..., description="Employee UUID"),
     month: str = Query(..., pattern=_MONTH_PATTERN, description="YYYY-MM"),
 ) -> AttendanceReport:
-    employee, rule, punches, year, month_num = await _load_report_context(
-        employee_id, month, session
+    employee, rule, punches, holidays, year, month_num = (
+        await _load_report_context(employee_id, month, session)
     )
-    days, totals = compute_month(_rule_to_spec(rule), punches, year, month_num)
+    days, totals = compute_month(
+        _rule_to_spec(rule, holidays), punches, year, month_num
+    )
     return AttendanceReport(
         month=month,
         employee=ReportEmployee(
@@ -121,6 +136,7 @@ async def attendance_report(
             AttendanceReportDay(
                 date=d.date,
                 is_workday=d.is_workday,
+                is_holiday=d.is_holiday,
                 is_absent=d.is_absent,
                 first_in=d.first_in,
                 last_out=d.last_out,
@@ -134,6 +150,7 @@ async def attendance_report(
         totals=AttendanceReportTotals(
             days_worked=totals.days_worked,
             days_absent=totals.days_absent,
+            days_holiday=totals.days_holiday,
             worked_minutes=totals.worked_minutes,
             late_minutes=totals.late_minutes,
             early_out_minutes=totals.early_out_minutes,
@@ -175,10 +192,12 @@ async def attendance_report_csv(
     employee_id: str = Query(..., description="Employee UUID"),
     month: str = Query(..., pattern=_MONTH_PATTERN, description="YYYY-MM"),
 ) -> Response:
-    employee, rule, punches, year, month_num = await _load_report_context(
-        employee_id, month, session
+    employee, rule, punches, holidays, year, month_num = (
+        await _load_report_context(employee_id, month, session)
     )
-    days, totals = compute_month(_rule_to_spec(rule), punches, year, month_num)
+    days, totals = compute_month(
+        _rule_to_spec(rule, holidays), punches, year, month_num
+    )
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -220,10 +239,12 @@ async def attendance_report_xlsx(
 
     from openpyxl import Workbook
 
-    employee, rule, punches, year, month_num = await _load_report_context(
-        employee_id, month, session
+    employee, rule, punches, holidays, year, month_num = (
+        await _load_report_context(employee_id, month, session)
     )
-    days, totals = compute_month(_rule_to_spec(rule), punches, year, month_num)
+    days, totals = compute_month(
+        _rule_to_spec(rule, holidays), punches, year, month_num
+    )
 
     wb = Workbook()
 
@@ -234,6 +255,7 @@ async def attendance_report_xlsx(
     summary.append([])
     summary.append(["Days worked", totals.days_worked])
     summary.append(["Days absent", totals.days_absent])
+    summary.append(["Days holiday", totals.days_holiday])
     summary.append(["Worked minutes", totals.worked_minutes])
     summary.append(["Late minutes", totals.late_minutes])
     summary.append(["Early-out minutes", totals.early_out_minutes])
