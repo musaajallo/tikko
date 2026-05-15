@@ -291,6 +291,40 @@ export const api = {
   deleteShiftRule: (id: string) =>
     request<void>(`/shift-rules/${id}`, { method: "DELETE" }),
 
+  listTemplates: (employeeId: string) =>
+    request<{
+      items: {
+        id: string;
+        employee_id: string;
+        source_device_id: string;
+        finger_id: number;
+        captured_at: string;
+      }[];
+      total: number;
+    }>(`/employees/${employeeId}/templates`),
+
+  pullTemplates: (employeeId: string, fromDeviceId: string) =>
+    request<{ stored: number; fingers: number[] }>(
+      `/employees/${employeeId}/templates/pull?from_device_id=${fromDeviceId}`,
+      { method: "POST" },
+    ),
+
+  pushTemplates: (employeeId: string, deviceIds: string[]) =>
+    request<{
+      results: {
+        device_id: string;
+        status: "pushed" | "failed";
+        fingers_pushed: number;
+        error: string | null;
+      }[];
+    }>(`/employees/${employeeId}/templates/push`, {
+      method: "POST",
+      body: JSON.stringify({ device_ids: deviceIds }),
+    }),
+
+  getEmployee: (id: string) =>
+    request<Employee>(`/employees/${id}`),
+
   // CSV download needs the bearer token, so a plain <a href> doesn't work.
   // We fetch as Blob and let the caller trigger a browser download.
   async downloadAttendanceCsv(

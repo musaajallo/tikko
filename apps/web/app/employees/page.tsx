@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreHorizontal, Plus, Users } from "lucide-react";
+import NextLink from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -311,6 +312,11 @@ export default function EmployeesPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openSync(e)}>
                             Sync to devices…
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <NextLink href={`/employees/${e.id}/templates`}>
+                              Manage templates…
+                            </NextLink>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setDeleteTarget(e)}
