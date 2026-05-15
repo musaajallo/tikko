@@ -31,6 +31,11 @@ const EMPTY_DEVICES: MockResponse = {
   json: async () => ({ items: [], total: 0 }),
 };
 
+const EMPTY_DEPARTMENTS: MockResponse = {
+  ok: true,
+  json: async () => ({ items: [], total: 0 }),
+};
+
 describe("Employees page", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -62,6 +67,7 @@ describe("Employees page", () => {
     const fetchMock = vi.fn((url: string) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       if (/\/employees/.test(url)) {
         return Promise.resolve({
           ok: true,
@@ -85,6 +91,7 @@ describe("Employees page", () => {
     const fetchMock = vi.fn((url: string) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       return Promise.resolve({
         ok: true,
         json: async () => ({ items: [], total: 0 }),
@@ -111,6 +118,7 @@ describe("Employees page", () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       if (/\/employees$/.test(url) && init?.method === "POST") {
         return Promise.resolve({ ok: true, json: async () => created });
       }
@@ -186,6 +194,7 @@ describe("Employees page", () => {
           json: async () => ({ items: [device], total: 1 }),
         });
       }
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       if (/\/employees\/emp-1\/sync/.test(url) && init?.method === "POST") {
         return Promise.resolve({
           ok: true,
@@ -240,6 +249,7 @@ describe("Employees page", () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       if (/\/employees\/emp-1$/.test(url) && init?.method === "PATCH") {
         return Promise.resolve({
           ok: true,
@@ -293,6 +303,7 @@ describe("Employees page", () => {
     const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       if (/\/employees/.test(url)) {
         return Promise.resolve({
           ok: true,
@@ -333,6 +344,7 @@ describe("Employees page", () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/devices/.test(url)) return Promise.resolve(EMPTY_DEVICES);
+      if (/\/departments/.test(url)) return Promise.resolve(EMPTY_DEPARTMENTS);
       if (/\/employees\/emp-1$/.test(url) && init?.method === "DELETE") {
         return Promise.resolve({
           ok: true,

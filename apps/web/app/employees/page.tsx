@@ -42,7 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { api } from "@/lib/api";
+import { api, type Department } from "@/lib/api";
 import type { Device, Employee, EmployeeSyncEntry } from "@tikko/shared-types";
 
 const STATUS_VARIANT: Record<Employee["status"], "default" | "secondary" | "destructive"> = {
@@ -54,12 +54,14 @@ const STATUS_VARIANT: Record<Employee["status"], "default" | "secondary" | "dest
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [addDepartmentId, setAddDepartmentId] = useState<string>("");
 
   const [syncTarget, setSyncTarget] = useState<Employee | null>(null);
   const [selectedDevices, setSelectedDevices] = useState<Record<string, boolean>>({});
@@ -69,6 +71,7 @@ export default function EmployeesPage() {
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
   const [editName, setEditName] = useState("");
   const [editStatus, setEditStatus] = useState<Employee["status"]>("active");
+  const [editDepartmentId, setEditDepartmentId] = useState<string>("");
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   // Delete confirm dialog
@@ -78,12 +81,18 @@ export default function EmployeesPage() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ items: emps }, { items: devs }] = await Promise.all([
+      const [{ items: emps }, { items: devs }, depts] = await Promise.all([
         api.listEmployees(),
         api.listDevices(),
+        // Best-effort: managers without view_departments still get the page.
+        api
+          .listDepartments()
+          .then((r) => r.items)
+          .catch(() => [] as Department[]),
       ]);
       setEmployees(emps);
       setDevices(devs);
+      setDepartments(depts);
     } catch (err) {
       toast.error("Failed to load employees", {
         description: err instanceof Error ? err.message : String(err),
@@ -101,10 +110,15 @@ export default function EmployeesPage() {
     event.preventDefault();
     setSubmitting(true);
     try {
-      await api.createEmployee({ employee_code: code, full_name: name });
+      await api.createEmployee({
+        employee_code: code,
+        full_name: name,
+        department_id: addDepartmentId === "" ? null : addDepartmentId,
+      });
       toast.success(`Added ${name}`);
       setCode("");
       setName("");
+      setAddDepartmentId("");
       setAddOpen(false);
       await refresh();
     } catch (err) {
@@ -120,6 +134,7 @@ export default function EmployeesPage() {
     setEditTarget(employee);
     setEditName(employee.full_name);
     setEditStatus(employee.status);
+    setEditDepartmentId(employee.department_id ?? "");
   };
   const closeEdit = () => setEditTarget(null);
 
@@ -131,6 +146,7 @@ export default function EmployeesPage() {
       await api.updateEmployee(editTarget.id, {
         full_name: editName,
         status: editStatus,
+        department_id: editDepartmentId === "" ? null : editDepartmentId,
       });
       toast.success(`Updated ${editName}`);
       closeEdit();
@@ -142,6 +158,11 @@ export default function EmployeesPage() {
     } finally {
       setEditSubmitting(false);
     }
+  };
+
+  const deptName = (id: string | null | undefined): string => {
+    if (!id) return "—";
+    return departments.find((d) => d.id === id)?.name ?? "—";
   };
 
   const onConfirmDelete = async () => {
@@ -249,6 +270,23 @@ export default function EmployeesPage() {
                     required
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="add_department">Department</Label>
+                  <select
+                    id="add_department"
+                    aria-label="department"
+                    value={addDepartmentId}
+                    onChange={(e) => setAddDepartmentId(e.target.value)}
+                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">— none —</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <DialogFooter>
                   <Button type="submit" disabled={submitting}>
                     {submitting ? "Adding…" : "Add employee"}
@@ -282,6 +320,7 @@ export default function EmployeesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Code</TableHead>
+                  <TableHead>Department</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
@@ -291,6 +330,9 @@ export default function EmployeesPage() {
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.full_name}</TableCell>
                     <TableCell className="font-mono text-xs">{e.employee_code}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {deptName(e.department_id)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[e.status]}>{e.status}</Badge>
                     </TableCell>
@@ -413,6 +455,23 @@ export default function EmployeesPage() {
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
                 <option value="terminated">terminated</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit_department">Department</Label>
+              <select
+                id="edit_department"
+                aria-label="department"
+                value={editDepartmentId}
+                onChange={(e) => setEditDepartmentId(e.target.value)}
+                className="h-10 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">— none —</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
               </select>
             </div>
             <DialogFooter>

@@ -55,6 +55,8 @@ export const EmployeeSchema = z.object({
   employee_code: z.string().regex(/^\d+$/),
   full_name: z.string().min(1),
   status: z.enum(["active", "inactive", "terminated"]),
+  shift_rule_id: z.string().uuid().nullable().optional(),
+  department_id: z.string().uuid().nullable().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });

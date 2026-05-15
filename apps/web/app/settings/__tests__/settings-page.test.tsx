@@ -83,6 +83,11 @@ const RULES_EMPTY: MockResponse = {
   json: async () => ({ items: [], total: 0 }),
 };
 
+const DEPARTMENTS_EMPTY: MockResponse = {
+  ok: true,
+  json: async () => ({ items: [], total: 0 }),
+};
+
 describe("Settings page", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -98,6 +103,7 @@ describe("Settings page", () => {
       vi.fn((url: string) => {
         if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
+      if (/\/departments/.test(url)) return Promise.resolve(DEPARTMENTS_EMPTY);
         if (/\/users/.test(url)) return Promise.resolve(USERS_TWO);
         if (/\/shift-rules/.test(url)) return Promise.resolve(RULES_ONE);
         return Promise.resolve(STATS_RESPONSE);
@@ -116,6 +122,7 @@ describe("Settings page", () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
+      if (/\/departments/.test(url)) return Promise.resolve(DEPARTMENTS_EMPTY);
       if (/\/users\/u-emp\/role/.test(url) && init?.method === "PATCH") {
         return Promise.resolve({
           ok: true,
@@ -160,6 +167,7 @@ describe("Settings page", () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
+      if (/\/departments/.test(url)) return Promise.resolve(DEPARTMENTS_EMPTY);
       if (/\/users/.test(url)) return Promise.resolve(USERS_TWO);
       if (/\/shift-rules$/.test(url) && init?.method === "POST") {
         return Promise.resolve({
@@ -216,6 +224,7 @@ describe("Settings page", () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
       if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
+      if (/\/departments/.test(url)) return Promise.resolve(DEPARTMENTS_EMPTY);
       if (/\/users/.test(url)) return Promise.resolve(USERS_TWO);
       if (/\/shift-rules\/r-1$/.test(url) && init?.method === "DELETE") {
         return Promise.resolve({

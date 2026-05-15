@@ -19,6 +19,7 @@ class EmployeeCreate(BaseModel):
     employee_code: str = Field(..., min_length=1, max_length=32, pattern=_CODE_PATTERN)
     full_name: str = Field(..., min_length=1, max_length=255)
     status: EmployeeStatus = "active"
+    department_id: str | None = None
 
 
 class EmployeeUpdate(BaseModel):
@@ -28,6 +29,8 @@ class EmployeeUpdate(BaseModel):
     # (we honour `model_fields_set` at the route layer); sending `null`
     # explicitly detaches the employee from their current shift rule.
     shift_rule_id: str | None = None
+    # Same null-vs-omitted contract as shift_rule_id; detaches from dept.
+    department_id: str | None = None
 
 
 class EmployeeRead(BaseModel):
@@ -38,6 +41,7 @@ class EmployeeRead(BaseModel):
     full_name: str
     status: EmployeeStatus
     shift_rule_id: str | None = None
+    department_id: str | None = None
     created_at: datetime
     updated_at: datetime
 

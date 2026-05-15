@@ -187,6 +187,26 @@ export interface ShiftRuleList {
 export type ShiftRuleCreate = Omit<ShiftRule, "id" | "created_at" | "updated_at">;
 export type ShiftRuleUpdate = Partial<ShiftRuleCreate>;
 
+export interface Department {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DepartmentList {
+  items: Department[];
+  total: number;
+}
+
+export interface DepartmentCreate {
+  name: string;
+  parent_id?: string | null;
+}
+
+export type DepartmentUpdate = Partial<DepartmentCreate>;
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -222,6 +242,7 @@ export const api = {
     employee_code: string;
     full_name: string;
     status?: EmployeeStatus;
+    department_id?: string | null;
   }) =>
     request<Employee>("/employees", {
       method: "POST",
@@ -230,7 +251,12 @@ export const api = {
 
   updateEmployee: (
     employeeId: string,
-    input: { full_name?: string; status?: EmployeeStatus; shift_rule_id?: string | null },
+    input: {
+      full_name?: string;
+      status?: EmployeeStatus;
+      shift_rule_id?: string | null;
+      department_id?: string | null;
+    },
   ) =>
     request<Employee>(`/employees/${employeeId}`, {
       method: "PATCH",
@@ -282,6 +308,23 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ role }),
     }),
+
+  listDepartments: () => request<DepartmentList>("/departments"),
+
+  createDepartment: (input: DepartmentCreate) =>
+    request<Department>("/departments", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateDepartment: (id: string, input: DepartmentUpdate) =>
+    request<Department>(`/departments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  deleteDepartment: (id: string) =>
+    request<void>(`/departments/${id}`, { method: "DELETE" }),
 
   listShiftRules: () => request<ShiftRuleList>("/shift-rules"),
 

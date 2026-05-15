@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from tikko.auth import require_capability
 from tikko.db import SessionDep
+from tikko.models.department import Department
 from tikko.models.device import Device
 from tikko.models.employee import Employee
 from tikko.models.employee_template import EmployeeTemplate
@@ -49,10 +50,15 @@ _manage_employee_templates = require_capability("manage_employee_templates")
 async def create_employee(
     payload: EmployeeCreate, session: SessionDep
 ) -> Employee:
+    if payload.department_id is not None:
+        dept = await session.get(Department, payload.department_id)
+        if dept is None:
+            raise HTTPException(status_code=404, detail="department not found")
     employee = Employee(
         employee_code=payload.employee_code,
         full_name=payload.full_name,
         status=payload.status,
+        department_id=payload.department_id,
     )
     session.add(employee)
     try:
@@ -123,6 +129,14 @@ async def update_employee(
                     status_code=404, detail="shift rule not found"
                 )
         employee.shift_rule_id = payload.shift_rule_id
+    if "department_id" in payload.model_fields_set:
+        if payload.department_id is not None:
+            dept = await session.get(Department, payload.department_id)
+            if dept is None:
+                raise HTTPException(
+                    status_code=404, detail="department not found"
+                )
+        employee.department_id = payload.department_id
 
     await session.flush()
     return employee

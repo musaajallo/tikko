@@ -36,6 +36,10 @@ class Employee(Base):
     shift_rule_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("shift_rules.id"), nullable=True, index=True
     )
+    # Optional department — drives F40's dept-roll-up reports.
+    department_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("departments.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

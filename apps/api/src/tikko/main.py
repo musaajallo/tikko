@@ -14,6 +14,7 @@ from tikko import __version__
 from tikko.db import Base, get_engine, get_sessionmaker
 from tikko.models import (  # noqa: F401 — register metadata
     AttendanceLog,
+    Department,
     Device,
     Employee,
     EmployeeTemplate,
@@ -23,6 +24,7 @@ from tikko.models import (  # noqa: F401 — register metadata
     UserTOTP,
 )
 from tikko.routes.auth import router as auth_router
+from tikko.routes.departments import router as departments_router
 from tikko.routes.devices import router as devices_router
 from tikko.routes.employees import router as employees_router
 from tikko.routes.iclock import router as iclock_router
@@ -112,6 +114,7 @@ def health() -> dict[str, str]:
 app.include_router(auth_router)
 app.include_router(totp_router)
 app.include_router(users_router)
+app.include_router(departments_router)
 app.include_router(devices_router)
 app.include_router(employees_router)
 app.include_router(me_router)

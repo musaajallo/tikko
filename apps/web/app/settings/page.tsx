@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Pencil, Plus, Trash2, Users2 } from "lucide-react";
+import { Building2, Clock, Pencil, Plus, Trash2, Users2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -36,6 +36,7 @@ import {
 import { PermissionsMatrix } from "@/components/permissions-matrix";
 import {
   api,
+  type Department,
   type ShiftRule,
   type ShiftRuleCreate,
   type UserListItem,
@@ -71,6 +72,19 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+
+  // Departments
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [deptDialog, setDeptDialog] = useState<{
+    mode: "add" | "edit";
+    dept: Department | null;
+  } | null>(null);
+  const [deptForm, setDeptForm] = useState<{ name: string; parent_id: string | null }>({
+    name: "",
+    parent_id: null,
+  });
+  const [deptSubmitting, setDeptSubmitting] = useState(false);
 
   // Shift rules
   const [rules, setRules] = useState<ShiftRule[]>([]);
@@ -110,10 +124,25 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const refreshDepartments = useCallback(async () => {
+    setDepartmentsLoading(true);
+    try {
+      const { items } = await api.listDepartments();
+      setDepartments(items);
+    } catch (err) {
+      toast.error("Failed to load departments", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshUsers();
     void refreshRules();
-  }, [refreshUsers, refreshRules]);
+    void refreshDepartments();
+  }, [refreshUsers, refreshRules, refreshDepartments]);
 
   const changeRole = async (user: UserListItem, role: UserRole) => {
     if (role === user.role) return;
@@ -190,6 +219,67 @@ export default function SettingsPage() {
           : message,
       });
     }
+  };
+
+  const openAddDept = () => {
+    setDeptForm({ name: "", parent_id: null });
+    setDeptDialog({ mode: "add", dept: null });
+  };
+
+  const openEditDept = (dept: Department) => {
+    setDeptForm({ name: dept.name, parent_id: dept.parent_id });
+    setDeptDialog({ mode: "edit", dept });
+  };
+
+  const closeDeptDialog = () => setDeptDialog(null);
+
+  const submitDept = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deptDialog) return;
+    setDeptSubmitting(true);
+    try {
+      if (deptDialog.mode === "add") {
+        await api.createDepartment({
+          name: deptForm.name,
+          parent_id: deptForm.parent_id,
+        });
+        toast.success(`Added ${deptForm.name}`);
+      } else if (deptDialog.dept) {
+        await api.updateDepartment(deptDialog.dept.id, {
+          name: deptForm.name,
+          parent_id: deptForm.parent_id,
+        });
+        toast.success(`Updated ${deptForm.name}`);
+      }
+      closeDeptDialog();
+      await refreshDepartments();
+    } catch (err) {
+      toast.error("Could not save department", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDeptSubmitting(false);
+    }
+  };
+
+  const deleteDept = async (dept: Department) => {
+    try {
+      await api.deleteDepartment(dept.id);
+      toast.success(`Removed ${dept.name}`);
+      await refreshDepartments();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error("Could not delete", {
+        description: /409/.test(message)
+          ? "Reassign affected employees or child departments first."
+          : message,
+      });
+    }
+  };
+
+  const deptName = (id: string | null): string => {
+    if (id === null) return "—";
+    return departments.find((d) => d.id === id)?.name ?? "—";
   };
 
   const toggleWorkDay = (index: number) => {
@@ -478,6 +568,142 @@ export default function SettingsPage() {
                         size="icon"
                         aria-label={`delete ${r.name}`}
                         onClick={() => void deleteRule(r)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* DEPARTMENTS SECTION */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-md bg-muted text-muted-foreground">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <div>
+              <CardTitle>Departments</CardTitle>
+              <CardDescription>
+                Org hierarchy. Employees opt in via the row Edit dialog on the
+                Employees page.
+              </CardDescription>
+            </div>
+          </div>
+          <Dialog
+            open={deptDialog !== null}
+            onOpenChange={(open) => !open && closeDeptDialog()}
+          >
+            <DialogTrigger asChild>
+              <Button onClick={openAddDept}>
+                <Plus className="mr-1 h-4 w-4" /> Add department
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {deptDialog?.mode === "edit"
+                    ? "Edit department"
+                    : "Add department"}
+                </DialogTitle>
+                <DialogDescription>
+                  Parent is optional; leave blank for a top-level node.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={submitDept} className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="dept_name">Name</Label>
+                  <Input
+                    id="dept_name"
+                    value={deptForm.name}
+                    onChange={(e) =>
+                      setDeptForm({ ...deptForm, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="dept_parent">Parent department</Label>
+                  <select
+                    id="dept_parent"
+                    aria-label="parent department"
+                    value={deptForm.parent_id ?? ""}
+                    onChange={(e) =>
+                      setDeptForm({
+                        ...deptForm,
+                        parent_id: e.target.value === "" ? null : e.target.value,
+                      })
+                    }
+                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">— none —</option>
+                    {departments
+                      .filter((d) => d.id !== deptDialog?.dept?.id)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={closeDeptDialog}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={deptSubmitting}>
+                    {deptSubmitting ? "Saving…" : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {departmentsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : departments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No departments yet. Add one to organise employees by team or
+              location.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Parent</TableHead>
+                  <TableHead className="w-[120px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {departments.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium">{d.name}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {deptName(d.parent_id)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`edit ${d.name}`}
+                        onClick={() => openEditDept(d)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`delete ${d.name}`}
+                        onClick={() => void deleteDept(d)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

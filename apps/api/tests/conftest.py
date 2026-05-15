@@ -32,6 +32,7 @@ from tikko.db import get_session
 from tikko.main import app
 from tikko.models import (  # noqa: F401 — register models with Base.metadata
     AttendanceLog,
+    Department,
     Device,
     Employee,
     EmployeeTemplate,

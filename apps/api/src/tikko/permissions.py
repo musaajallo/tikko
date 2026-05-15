@@ -24,6 +24,9 @@ Capability = Literal[
     "manage_employees",
     "sync_employees",
     "manage_employee_templates",
+    # Departments (F33)
+    "view_departments",
+    "manage_departments",
     # Leave (third-person manager view)
     "view_team_leave",
     "decide_leave",
@@ -56,6 +59,7 @@ DEFAULT_MATRIX: Final[dict[Role, frozenset[Capability]]] = {
             "view_devices",
             "poll_devices",
             "view_employees",
+            "view_departments",
             "view_team_leave",
             "decide_leave",
             "view_shift_rules",
