@@ -8,6 +8,7 @@ from tikko.models.leave_request import LeaveRequest
 from tikko.models.shift_rule import ShiftRule
 from tikko.models.user import User
 from tikko.models.user_totp import UserTOTP
+from tikko.models.user_totp_recovery_code import UserTOTPRecoveryCode
 
 __all__ = [
     "AttendanceLog",
@@ -18,4 +19,5 @@ __all__ = [
     "ShiftRule",
     "User",
     "UserTOTP",
+    "UserTOTPRecoveryCode",
 ]

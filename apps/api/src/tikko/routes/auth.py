@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pyotp
 from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
@@ -17,6 +19,8 @@ from tikko.db import SessionDep
 from tikko.models.employee import Employee
 from tikko.models.user import User
 from tikko.models.user_totp import UserTOTP
+from tikko.models.user_totp_recovery_code import UserTOTPRecoveryCode
+from tikko.routes.totp import hash_recovery_code
 from tikko.schemas.employee import EmployeeRead
 from tikko.schemas.user import (
     AuthMeResponse,
@@ -95,12 +99,29 @@ async def login(payload: LoginPayload, session: SessionDep) -> TokenResponse:
         if totp is not None and totp.enabled:
             if payload.totp_code is None:
                 raise HTTPException(status_code=401, detail="totp_required")
-            # Same 1-step drift window as /auth/totp/verify keeps the door open
-            # when the client clock is slightly off.
-            if not pyotp.TOTP(totp.secret_b32).verify(
+            # Try the TOTP first — same 1-step drift window as /auth/totp/verify
+            # keeps the door open when the client clock is slightly off.
+            totp_valid = pyotp.TOTP(totp.secret_b32).verify(
                 payload.totp_code, valid_window=1
-            ):
-                raise HTTPException(status_code=401, detail="invalid totp code")
+            )
+            if not totp_valid:
+                # Fall back to a single-use recovery code. We mark used_at
+                # before issuing tokens so a successful login burns the code
+                # even if the client retries.
+                code_row = await session.scalar(
+                    select(UserTOTPRecoveryCode).where(
+                        UserTOTPRecoveryCode.user_id == user.id,
+                        UserTOTPRecoveryCode.code_hash
+                        == hash_recovery_code(payload.totp_code),
+                        UserTOTPRecoveryCode.used_at.is_(None),
+                    )
+                )
+                if code_row is None:
+                    raise HTTPException(
+                        status_code=401, detail="invalid totp code"
+                    )
+                code_row.used_at = datetime.now(UTC)
+                await session.flush()
 
     return TokenResponse(
         access_token=issue_access_token(user.id, user.role),

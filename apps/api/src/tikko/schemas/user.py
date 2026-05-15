@@ -33,8 +33,11 @@ class UserRead(BaseModel):
 class LoginPayload(BaseModel):
     email: EmailStr
     password: str
-    # Required only when the user is an admin with TOTP enabled. Six digits.
-    totp_code: str | None = Field(default=None, pattern=r"^\d{6}$")
+    # Required when the user is an admin with TOTP enabled. Either:
+    # - a 6-digit TOTP code from the authenticator app, or
+    # - a 10-character recovery code (single-use).
+    # The server tries TOTP first, then falls back to recovery-code lookup.
+    totp_code: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):

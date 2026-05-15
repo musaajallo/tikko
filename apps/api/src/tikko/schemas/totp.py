@@ -20,7 +20,18 @@ class TOTPVerifyRequest(BaseModel):
 
 class TOTPVerifyResponse(BaseModel):
     enabled: bool
+    # Plaintext codes returned **once** at verify time. The server stores only
+    # SHA-256 hashes; the user must save these somewhere safe.
+    recovery_codes: list[str]
 
 
 class TOTPDisableRequest(BaseModel):
     password: str
+
+
+class TOTPRecoveryCodesRegenerateRequest(BaseModel):
+    password: str
+
+
+class TOTPRecoveryCodesResponse(BaseModel):
+    recovery_codes: list[str]

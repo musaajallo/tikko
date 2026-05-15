@@ -1,22 +1,67 @@
-"""TOTP enrollment + verification + disable (admin login enforcement is in `routes/auth.py`)."""
+"""TOTP enrollment + verification + disable + recovery codes.
+
+Admin login enforcement (and recovery-code redemption at login) lives in
+`routes/auth.py`.
+"""
 
 from __future__ import annotations
 
+import hashlib
+import secrets
+
 import pyotp
 from fastapi import APIRouter, HTTPException, Response, status
+from sqlalchemy import delete
 
 from tikko.auth import CurrentUserDep, verify_password
 from tikko.db import SessionDep
 from tikko.models.user import User
 from tikko.models.user_totp import UserTOTP
+from tikko.models.user_totp_recovery_code import UserTOTPRecoveryCode
 from tikko.schemas.totp import (
     TOTPDisableRequest,
     TOTPEnrollResponse,
+    TOTPRecoveryCodesRegenerateRequest,
+    TOTPRecoveryCodesResponse,
     TOTPVerifyRequest,
     TOTPVerifyResponse,
 )
 
 router = APIRouter(prefix="/auth/totp", tags=["auth"])
+
+
+_RECOVERY_CODE_COUNT = 10
+
+
+def _new_recovery_code() -> str:
+    """Generate one user-facing recovery code (10 lowercase hex chars)."""
+    return secrets.token_hex(5)  # 5 bytes → 10 hex chars
+
+
+def hash_recovery_code(plaintext: str) -> str:
+    """Hash function used for both insert and lookup. Stripped + lowercased."""
+    normalised = plaintext.strip().lower().replace("-", "").replace(" ", "")
+    return hashlib.sha256(normalised.encode("ascii")).hexdigest()
+
+
+async def _replace_recovery_codes(
+    session: SessionDep, user_id: str
+) -> list[str]:
+    """Wipe any existing codes for the user and insert a fresh batch.
+
+    Returns the plaintext codes — caller must hand them back to the user once
+    and then never again.
+    """
+    await session.execute(
+        delete(UserTOTPRecoveryCode).where(UserTOTPRecoveryCode.user_id == user_id)
+    )
+    plaintexts = [_new_recovery_code() for _ in range(_RECOVERY_CODE_COUNT)]
+    for code in plaintexts:
+        session.add(
+            UserTOTPRecoveryCode(user_id=user_id, code_hash=hash_recovery_code(code))
+        )
+    await session.flush()
+    return plaintexts
 
 _ISSUER = "tikko"
 
@@ -79,9 +124,17 @@ async def verify_totp(
             detail="invalid TOTP code",
         )
 
+    first_time = not record.enabled
     record.enabled = True
     await session.flush()
-    return TOTPVerifyResponse(enabled=True)
+
+    # Generate recovery codes only on the first verify of an enrollment cycle.
+    # If the user calls /verify again (idempotent OK), they don't get fresh codes.
+    if first_time:
+        codes = await _replace_recovery_codes(session, current.id)
+    else:
+        codes = []
+    return TOTPVerifyResponse(enabled=True, recovery_codes=codes)
 
 
 @router.post("/disable", status_code=status.HTTP_204_NO_CONTENT)
@@ -100,5 +153,30 @@ async def disable_totp(
     record = await session.get(UserTOTP, current.id)
     if record is not None:
         await session.delete(record)
-        await session.flush()
+    # Disable wipes recovery codes too — dangling codes after the TOTP is
+    # gone would be confusing at best and risky at worst.
+    await session.execute(
+        delete(UserTOTPRecoveryCode).where(
+            UserTOTPRecoveryCode.user_id == current.id
+        )
+    )
+    await session.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/recovery-codes/regenerate", response_model=TOTPRecoveryCodesResponse
+)
+async def regenerate_recovery_codes(
+    payload: TOTPRecoveryCodesRegenerateRequest,
+    session: SessionDep,
+    current: CurrentUserDep,
+) -> TOTPRecoveryCodesResponse:
+    user = await session.get(User, current.id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="user no longer exists")
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="invalid password")
+
+    codes = await _replace_recovery_codes(session, current.id)
+    return TOTPRecoveryCodesResponse(recovery_codes=codes)
