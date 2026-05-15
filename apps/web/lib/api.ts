@@ -325,6 +325,43 @@ export const api = {
   getEmployee: (id: string) =>
     request<Employee>(`/employees/${id}`),
 
+  listLeaveRequests: (
+    status?: "pending" | "approved" | "rejected",
+    page = 1,
+    pageSize = 50,
+  ) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (status) params.set("status", status);
+    return request<{
+      items: {
+        id: string;
+        employee_id: string;
+        employee_code: string | null;
+        employee_full_name: string | null;
+        start_date: string;
+        end_date: string;
+        reason: string;
+        status: "pending" | "approved" | "rejected";
+        created_at: string;
+        decided_at: string | null;
+        decided_by_user_id: string | null;
+      }[];
+      total: number;
+    }>(`/leave-requests?${params.toString()}`);
+  },
+
+  decideLeaveRequest: (id: string, decision: "approved" | "rejected") =>
+    request<{ id: string; status: "approved" | "rejected" }>(
+      `/leave-requests/${id}/decision`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ decision }),
+      },
+    ),
+
   // CSV download needs the bearer token, so a plain <a href> doesn't work.
   // We fetch as Blob and let the caller trigger a browser download.
   async downloadAttendanceCsv(

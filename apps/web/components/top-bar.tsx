@@ -29,6 +29,7 @@ type NavItem = {
 const primary: NavItem[] = [
   { href: "/devices" as Route, label: "Devices" },
   { href: "/employees" as Route, label: "Employees" },
+  { href: "/leave-requests" as Route, label: "Leave" },
   { href: "/reports" as Route, label: "Reports" },
   { href: "/settings" as Route, label: "Settings" },
 ];
