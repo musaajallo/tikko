@@ -3,6 +3,8 @@ import * as React from "react";
 import { Geist } from "next/font/google";
 import { Toaster } from "sonner";
 
+import { CurrentUserProvider } from "@/components/current-user-context";
+import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +23,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn(geist.variable)} suppressHydrationWarning>
       <body>
-        <TooltipProvider>{children}</TooltipProvider>
+        <ThemeProvider>
+          <CurrentUserProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </CurrentUserProvider>
+        </ThemeProvider>
         <Toaster richColors closeButton position="top-right" />
       </body>
     </html>

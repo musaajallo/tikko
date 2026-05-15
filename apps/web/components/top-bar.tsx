@@ -1,10 +1,14 @@
 "use client";
 
-import { Bell, Plus, Search, Zap } from "lucide-react";
+import { Bell, Moon, Plus, Search, Sun, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
+import { useCurrentUser } from "@/components/current-user-context";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,29 +22,50 @@ import { Input } from "@/components/ui/input";
 import { clearToken } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+type Role = "admin" | "manager" | "employee";
+
 type NavItem = {
   href: Route;
   label: string;
+  // Minimum role required to see this nav item. The api enforces the same gate
+  // server-side; this just stops users from clicking into a guaranteed-403.
+  allowedRoles: ReadonlyArray<Role>;
   // `soon` items still navigate (to a placeholder page) but render a SOON badge
   // to signal that the underlying feature isn't fully built.
   soon?: boolean;
 };
 
 const primary: NavItem[] = [
-  { href: "/devices" as Route, label: "Devices" },
-  { href: "/employees" as Route, label: "Employees" },
-  { href: "/leave-requests" as Route, label: "Leave" },
-  { href: "/reports" as Route, label: "Reports" },
-  { href: "/settings" as Route, label: "Settings" },
+  { href: "/devices" as Route, label: "Devices", allowedRoles: ["admin", "manager"] },
+  { href: "/employees" as Route, label: "Employees", allowedRoles: ["admin", "manager"] },
+  { href: "/leave-requests" as Route, label: "Leave", allowedRoles: ["admin", "manager"] },
+  { href: "/reports" as Route, label: "Reports", allowedRoles: ["admin", "manager"] },
+  { href: "/settings" as Route, label: "Settings", allowedRoles: ["admin"] },
 ];
 
 const secondary: NavItem[] = [
-  { href: "/documentation" as Route, label: "Docs", soon: true },
+  {
+    href: "/documentation" as Route,
+    label: "Docs",
+    soon: true,
+    allowedRoles: ["admin", "manager", "employee"],
+  },
 ];
+
+function avatarInitials(email?: string | null): string {
+  if (!email) return "??";
+  const local = email.split("@")[0] ?? "";
+  return (local.slice(0, 2) || "??").toUpperCase();
+}
 
 export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
+  const { me } = useCurrentUser();
+  const role = me?.user.role ?? null;
+
+  const visible = (item: NavItem) =>
+    role !== null && item.allowedRoles.includes(role);
 
   const signOut = () => {
     clearToken();
@@ -57,7 +82,7 @@ export function TopBar() {
       </Link>
 
       <nav className="ml-3 hidden items-center gap-1 text-sm md:flex">
-        {primary.map((item) => (
+        {primary.filter(visible).map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} />
         ))}
       </nav>
@@ -76,15 +101,21 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-2">
         <nav className="hidden items-center gap-1 text-sm md:flex">
-          {secondary.map((item) => (
+          {secondary.filter(visible).map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} />
           ))}
         </nav>
 
-        <Button size="sm" className="hidden sm:inline-flex">
-          <Plus className="mr-1 h-4 w-4" />
-          New device
-        </Button>
+        {role === "admin" && (
+          <Button size="sm" className="hidden sm:inline-flex" asChild>
+            <Link href="/devices">
+              <Plus className="mr-1 h-4 w-4" />
+              New device
+            </Link>
+          </Button>
+        )}
+
+        <ThemeToggle />
 
         <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
           <Bell className="h-4 w-4" />
@@ -98,11 +129,22 @@ export function TopBar() {
               className="grid h-8 w-8 place-items-center rounded-full bg-muted text-xs font-semibold uppercase ring-2 ring-transparent transition hover:ring-ring/40"
               aria-label="Account menu"
             >
-              AD
+              {avatarInitials(me?.user.email)}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Signed in</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col gap-1">
+                <span className="truncate text-sm font-medium">
+                  {me?.user.email ?? "Signed in"}
+                </span>
+                {role && (
+                  <Badge variant="secondary" className="w-fit text-[10px]">
+                    {role}
+                  </Badge>
+                )}
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/profile">Profile</Link>
@@ -113,6 +155,29 @@ export function TopBar() {
         </DropdownMenu>
       </div>
     </header>
+  );
+}
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  // `next-themes` only knows the real value after hydration, so we render an
+  // empty placeholder on the server to dodge the hydration mismatch.
+  useEffect(() => setMounted(true), []);
+  const isDark = resolvedTheme === "dark";
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+    >
+      {mounted ? (
+        isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
+      ) : (
+        <span className="h-4 w-4" />
+      )}
+    </Button>
   );
 }
 

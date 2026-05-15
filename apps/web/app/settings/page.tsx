@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PermissionsMatrix } from "@/components/permissions-matrix";
 import {
   api,
   type ShiftRule,
@@ -488,6 +489,8 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <PermissionsMatrix />
     </div>
   );
 }
