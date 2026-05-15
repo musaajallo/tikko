@@ -10,12 +10,15 @@ type Ctx = {
   me: AuthMeResponse | null;
   loading: boolean;
   refresh: () => Promise<void>;
+  /** True if the current user's role has been granted `cap`. */
+  hasCapability: (cap: string) => boolean;
 };
 
 const CurrentUserContext = createContext<Ctx>({
   me: null,
   loading: true,
   refresh: async () => {},
+  hasCapability: () => false,
 });
 
 // Paths the user can hit without being signed in. Everything else bounces to
@@ -67,8 +70,11 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  const caps = me?.capabilities ?? [];
+  const hasCapability = (cap: string) => caps.includes(cap);
+
   return (
-    <CurrentUserContext.Provider value={{ me, loading, refresh }}>
+    <CurrentUserContext.Provider value={{ me, loading, refresh, hasCapability }}>
       {children}
     </CurrentUserContext.Provider>
   );
@@ -81,4 +87,9 @@ export function useCurrentUser(): Ctx {
 export function useRole(): "admin" | "manager" | "employee" | null {
   const { me } = useCurrentUser();
   return me?.user.role ?? null;
+}
+
+export function useHasCapability(cap: string): boolean {
+  const { hasCapability } = useCurrentUser();
+  return hasCapability(cap);
 }

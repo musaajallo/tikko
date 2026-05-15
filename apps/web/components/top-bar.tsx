@@ -22,34 +22,28 @@ import { Input } from "@/components/ui/input";
 import { clearToken } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-type Role = "admin" | "manager" | "employee";
-
 type NavItem = {
   href: Route;
   label: string;
-  // Minimum role required to see this nav item. The api enforces the same gate
+  // The capability needed to see this item. The api enforces the same gate
   // server-side; this just stops users from clicking into a guaranteed-403.
-  allowedRoles: ReadonlyArray<Role>;
+  // `null` means "visible to anyone signed in".
+  requires: string | null;
   // `soon` items still navigate (to a placeholder page) but render a SOON badge
   // to signal that the underlying feature isn't fully built.
   soon?: boolean;
 };
 
 const primary: NavItem[] = [
-  { href: "/devices" as Route, label: "Devices", allowedRoles: ["admin", "manager"] },
-  { href: "/employees" as Route, label: "Employees", allowedRoles: ["admin", "manager"] },
-  { href: "/leave-requests" as Route, label: "Leave", allowedRoles: ["admin", "manager"] },
-  { href: "/reports" as Route, label: "Reports", allowedRoles: ["admin", "manager"] },
-  { href: "/settings" as Route, label: "Settings", allowedRoles: ["admin"] },
+  { href: "/devices" as Route, label: "Devices", requires: "view_devices" },
+  { href: "/employees" as Route, label: "Employees", requires: "view_employees" },
+  { href: "/leave-requests" as Route, label: "Leave", requires: "view_team_leave" },
+  { href: "/reports" as Route, label: "Reports", requires: "view_reports" },
+  { href: "/settings" as Route, label: "Settings", requires: "manage_permissions" },
 ];
 
 const secondary: NavItem[] = [
-  {
-    href: "/documentation" as Route,
-    label: "Docs",
-    soon: true,
-    allowedRoles: ["admin", "manager", "employee"],
-  },
+  { href: "/documentation" as Route, label: "Docs", soon: true, requires: null },
 ];
 
 function avatarInitials(email?: string | null): string {
@@ -61,11 +55,11 @@ function avatarInitials(email?: string | null): string {
 export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { me } = useCurrentUser();
+  const { me, hasCapability } = useCurrentUser();
   const role = me?.user.role ?? null;
 
   const visible = (item: NavItem) =>
-    role !== null && item.allowedRoles.includes(role);
+    me !== null && (item.requires === null || hasCapability(item.requires));
 
   const signOut = () => {
     clearToken();
@@ -106,7 +100,7 @@ export function TopBar() {
           ))}
         </nav>
 
-        {role === "admin" && (
+        {hasCapability("manage_devices") && (
           <Button size="sm" className="hidden sm:inline-flex" asChild>
             <Link href="/devices">
               <Plus className="mr-1 h-4 w-4" />

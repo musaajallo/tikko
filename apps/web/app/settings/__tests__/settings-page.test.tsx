@@ -14,6 +14,15 @@ interface MockResponse {
   text?: () => Promise<string>;
 }
 
+const PERMISSIONS_RESPONSE: MockResponse = {
+  ok: true,
+  json: async () => ({
+    matrix: { admin: [], manager: [], employee: [] },
+    all_roles: ["admin", "manager", "employee"],
+    all_capabilities: [],
+  }),
+};
+
 const STATS_RESPONSE: MockResponse = {
   ok: true,
   json: async () => ({
@@ -88,6 +97,7 @@ describe("Settings page", () => {
       "fetch",
       vi.fn((url: string) => {
         if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
         if (/\/users/.test(url)) return Promise.resolve(USERS_TWO);
         if (/\/shift-rules/.test(url)) return Promise.resolve(RULES_ONE);
         return Promise.resolve(STATS_RESPONSE);
@@ -105,6 +115,7 @@ describe("Settings page", () => {
   it("PATCHes /users/:id/role when the role select changes", async () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
       if (/\/users\/u-emp\/role/.test(url) && init?.method === "PATCH") {
         return Promise.resolve({
           ok: true,
@@ -148,6 +159,7 @@ describe("Settings page", () => {
     let ruleListCalls = 0;
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
       if (/\/users/.test(url)) return Promise.resolve(USERS_TWO);
       if (/\/shift-rules$/.test(url) && init?.method === "POST") {
         return Promise.resolve({
@@ -203,6 +215,7 @@ describe("Settings page", () => {
   it("DELETEs a shift rule via the row action", async () => {
     const fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (/\/stats/.test(url)) return Promise.resolve(STATS_RESPONSE);
+      if (/\/permissions/.test(url)) return Promise.resolve(PERMISSIONS_RESPONSE);
       if (/\/users/.test(url)) return Promise.resolve(USERS_TWO);
       if (/\/shift-rules\/r-1$/.test(url) && init?.method === "DELETE") {
         return Promise.resolve({

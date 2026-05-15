@@ -136,6 +136,15 @@ export interface UserMe {
 export interface AuthMeResponse {
   user: UserMe;
   employee: Employee | null;
+  // Flat list of capability names granted to this user's role. Source of
+  // truth for UI gating; the api enforces the same list server-side.
+  capabilities: string[];
+}
+
+export interface PermissionsMatrixResponse {
+  matrix: Record<UserRole, string[]>;
+  all_roles: UserRole[];
+  all_capabilities: string[];
 }
 
 export interface TOTPEnrollResponse {
@@ -361,6 +370,14 @@ export const api = {
         body: JSON.stringify({ decision }),
       },
     ),
+
+  getPermissions: () => request<PermissionsMatrixResponse>("/permissions"),
+
+  patchPermission: (role: UserRole, capability: string, granted: boolean) =>
+    request<void>("/permissions", {
+      method: "PATCH",
+      body: JSON.stringify({ role, capability, granted }),
+    }),
 
   // CSV download needs the bearer token, so a plain <a href> doesn't work.
   // We fetch as Blob and let the caller trigger a browser download.
