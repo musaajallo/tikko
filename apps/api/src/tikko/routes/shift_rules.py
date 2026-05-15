@@ -5,7 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
-from tikko.auth import require_capability
+from tikko.audit import log_audit
+from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.models.employee import Employee
 from tikko.models.shift_rule import ShiftRule
@@ -15,6 +16,19 @@ from tikko.schemas.shift_rule import (
     ShiftRuleRead,
     ShiftRuleUpdate,
 )
+
+
+def _rule_snapshot(rule: ShiftRule) -> dict[str, object | None]:
+    return {
+        "id": rule.id,
+        "name": rule.name,
+        "start_time": rule.start_time.isoformat() if rule.start_time else None,
+        "end_time": rule.end_time.isoformat() if rule.end_time else None,
+        "late_grace_minutes": rule.late_grace_minutes,
+        "early_out_grace_minutes": rule.early_out_grace_minutes,
+        "overtime_threshold_minutes": rule.overtime_threshold_minutes,
+        "work_days": rule.work_days,
+    }
 
 router = APIRouter(prefix="/shift-rules", tags=["shift-rules"])
 
@@ -29,11 +43,19 @@ _view_shift_rules = require_capability("view_shift_rules")
     dependencies=[_manage_shift_rules],
 )
 async def create_shift_rule(
-    payload: ShiftRuleCreate, session: SessionDep
+    payload: ShiftRuleCreate, session: SessionDep, current: CurrentUserDep
 ) -> ShiftRule:
     rule = ShiftRule(**payload.model_dump())
     session.add(rule)
     await session.flush()
+    await log_audit(
+        session,
+        actor=current,
+        action="create_shift_rule",
+        resource_type="shift_rule",
+        resource_id=rule.id,
+        after=_rule_snapshot(rule),
+    )
     return rule
 
 
@@ -73,12 +95,16 @@ async def get_shift_rule(rule_id: str, session: SessionDep) -> ShiftRule:
     "/{rule_id}", response_model=ShiftRuleRead, dependencies=[_manage_shift_rules]
 )
 async def update_shift_rule(
-    rule_id: str, payload: ShiftRuleUpdate, session: SessionDep
+    rule_id: str,
+    payload: ShiftRuleUpdate,
+    session: SessionDep,
+    current: CurrentUserDep,
 ) -> ShiftRule:
     rule = await session.get(ShiftRule, rule_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="shift rule not found")
 
+    before = _rule_snapshot(rule)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
         setattr(rule, key, value)
@@ -93,6 +119,15 @@ async def update_shift_rule(
         )
 
     await session.flush()
+    await log_audit(
+        session,
+        actor=current,
+        action="update_shift_rule",
+        resource_type="shift_rule",
+        resource_id=rule.id,
+        before=before,
+        after=_rule_snapshot(rule),
+    )
     return rule
 
 
@@ -101,7 +136,9 @@ async def update_shift_rule(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[_manage_shift_rules],
 )
-async def delete_shift_rule(rule_id: str, session: SessionDep) -> Response:
+async def delete_shift_rule(
+    rule_id: str, session: SessionDep, current: CurrentUserDep
+) -> Response:
     rule = await session.get(ShiftRule, rule_id)
     if rule is None:
         raise HTTPException(status_code=404, detail="shift rule not found")
@@ -120,6 +157,15 @@ async def delete_shift_rule(rule_id: str, session: SessionDep) -> Response:
             detail=f"{assigned_count} employee(s) still assigned to this shift rule",
         )
 
+    before = _rule_snapshot(rule)
     await session.delete(rule)
+    await log_audit(
+        session,
+        actor=current,
+        action="delete_shift_rule",
+        resource_type="shift_rule",
+        resource_id=rule_id,
+        before=before,
+    )
     await session.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

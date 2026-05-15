@@ -8,13 +8,25 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from tikko.auth import require_capability
+from tikko.audit import log_audit
+from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.models.department import Department
 from tikko.models.device import Device
 from tikko.models.employee import Employee
 from tikko.models.employee_template import EmployeeTemplate
 from tikko.models.shift_rule import ShiftRule
+
+
+def _emp_snapshot(emp: Employee) -> dict[str, object | None]:
+    return {
+        "id": emp.id,
+        "employee_code": emp.employee_code,
+        "full_name": emp.full_name,
+        "status": emp.status,
+        "shift_rule_id": emp.shift_rule_id,
+        "department_id": emp.department_id,
+    }
 from tikko.schemas.employee import (
     EmployeeCreate,
     EmployeeList,
@@ -48,7 +60,7 @@ _manage_employee_templates = require_capability("manage_employee_templates")
     dependencies=[_manage_employees],
 )
 async def create_employee(
-    payload: EmployeeCreate, session: SessionDep
+    payload: EmployeeCreate, session: SessionDep, current: CurrentUserDep
 ) -> Employee:
     if payload.department_id is not None:
         dept = await session.get(Department, payload.department_id)
@@ -69,6 +81,14 @@ async def create_employee(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"employee_code {payload.employee_code!r} already exists",
         ) from exc
+    await log_audit(
+        session,
+        actor=current,
+        action="create_employee",
+        resource_type="employee",
+        resource_id=employee.id,
+        after=_emp_snapshot(employee),
+    )
     return employee
 
 
@@ -109,12 +129,16 @@ async def get_employee(employee_id: str, session: SessionDep) -> Employee:
     "/{employee_id}", response_model=EmployeeRead, dependencies=[_manage_employees]
 )
 async def update_employee(
-    employee_id: str, payload: EmployeeUpdate, session: SessionDep
+    employee_id: str,
+    payload: EmployeeUpdate,
+    session: SessionDep,
+    current: CurrentUserDep,
 ) -> Employee:
     employee = await session.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=404, detail="employee not found")
 
+    before = _emp_snapshot(employee)
     if payload.full_name is not None:
         employee.full_name = payload.full_name
     if payload.status is not None:
@@ -139,6 +163,17 @@ async def update_employee(
         employee.department_id = payload.department_id
 
     await session.flush()
+    after = _emp_snapshot(employee)
+    if before != after:
+        await log_audit(
+            session,
+            actor=current,
+            action="update_employee",
+            resource_type="employee",
+            resource_id=employee.id,
+            before=before,
+            after=after,
+        )
     return employee
 
 
@@ -147,12 +182,23 @@ async def update_employee(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[_manage_employees],
 )
-async def delete_employee(employee_id: str, session: SessionDep) -> Response:
+async def delete_employee(
+    employee_id: str, session: SessionDep, current: CurrentUserDep
+) -> Response:
     employee = await session.get(Employee, employee_id)
     if employee is None:
         raise HTTPException(status_code=404, detail="employee not found")
 
+    before = _emp_snapshot(employee)
     await session.delete(employee)
+    await log_audit(
+        session,
+        actor=current,
+        action="delete_employee",
+        resource_type="employee",
+        resource_id=employee_id,
+        before=before,
+    )
     await session.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

@@ -10,7 +10,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from tikko.auth import require_capability
+from tikko.audit import log_audit
+from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.models.user import User
 from tikko.schemas.user import UserList, UserRead, UserRoleUpdate
@@ -43,7 +44,10 @@ async def list_users(
     "/{user_id}/role", response_model=UserRead, dependencies=[_manage_users]
 )
 async def update_user_role(
-    user_id: str, payload: UserRoleUpdate, session: SessionDep
+    user_id: str,
+    payload: UserRoleUpdate,
+    session: SessionDep,
+    current: CurrentUserDep,
 ) -> User:
     user = await session.get(User, user_id)
     if user is None:
@@ -65,6 +69,17 @@ async def update_user_role(
                 detail="cannot demote the last admin",
             )
 
+    before_role = user.role
     user.role = payload.role
     await session.flush()
+    if before_role != user.role:
+        await log_audit(
+            session,
+            actor=current,
+            action="update_user_role",
+            resource_type="user",
+            resource_id=user.id,
+            before={"role": before_role, "email": user.email},
+            after={"role": user.role, "email": user.email},
+        )
     return user

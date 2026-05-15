@@ -1,6 +1,7 @@
 """ORM models. Import here so Base.metadata sees every model on first import."""
 
 from tikko.models.attendance import AttendanceLog
+from tikko.models.audit_event import AuditEvent
 from tikko.models.department import Department
 from tikko.models.device import Device
 from tikko.models.employee import Employee
@@ -14,6 +15,7 @@ from tikko.models.user_totp_recovery_code import UserTOTPRecoveryCode
 
 __all__ = [
     "AttendanceLog",
+    "AuditEvent",
     "Department",
     "Device",
     "Employee",

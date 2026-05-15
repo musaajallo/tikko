@@ -39,6 +39,8 @@ Capability = Literal[
     # Users + permissions
     "manage_users",
     "manage_permissions",
+    # Audit log (F34)
+    "view_audit_log",
 ]
 
 ALL_CAPABILITIES: Final[tuple[Capability, ...]] = cast(

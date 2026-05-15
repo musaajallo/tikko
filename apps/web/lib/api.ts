@@ -207,6 +207,22 @@ export interface DepartmentCreate {
 
 export type DepartmentUpdate = Partial<DepartmentCreate>;
 
+export interface AuditEvent {
+  id: string;
+  actor_user_id: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  before: unknown | null;
+  after: unknown | null;
+  created_at: string;
+}
+
+export interface AuditEventList {
+  items: AuditEvent[];
+  total: number;
+}
+
 export const api = {
   login: (input: { email: string; password: string }) =>
     request<TokenResponse>("/auth/login", {
@@ -308,6 +324,23 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ role }),
     }),
+
+  listAuditLog: (params?: {
+    page?: number;
+    pageSize?: number;
+    actorUserId?: string;
+    resourceType?: string;
+    action?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.page) sp.set("page", String(params.page));
+    if (params?.pageSize) sp.set("page_size", String(params.pageSize));
+    if (params?.actorUserId) sp.set("actor_user_id", params.actorUserId);
+    if (params?.resourceType) sp.set("resource_type", params.resourceType);
+    if (params?.action) sp.set("action", params.action);
+    const qs = sp.toString();
+    return request<AuditEventList>(`/audit-log${qs ? `?${qs}` : ""}`);
+  },
 
   listDepartments: () => request<DepartmentList>("/departments"),
 

@@ -40,6 +40,7 @@ const primary: NavItem[] = [
   { href: "/leave-requests" as Route, label: "Leave", requires: "view_team_leave" },
   { href: "/devices" as Route, label: "Devices", requires: "view_devices" },
   { href: "/settings" as Route, label: "Settings", requires: "manage_permissions" },
+  { href: "/audit" as Route, label: "Audit", requires: "view_audit_log" },
 ];
 
 const secondary: NavItem[] = [

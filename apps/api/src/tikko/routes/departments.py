@@ -9,7 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
-from tikko.auth import require_capability
+from tikko.audit import log_audit
+from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.models.department import Department
 from tikko.models.employee import Employee
@@ -19,6 +20,10 @@ from tikko.schemas.department import (
     DepartmentRead,
     DepartmentUpdate,
 )
+
+
+def _snapshot(dept: Department) -> dict[str, object | None]:
+    return {"id": dept.id, "name": dept.name, "parent_id": dept.parent_id}
 
 router = APIRouter(prefix="/departments", tags=["departments"])
 
@@ -55,12 +60,20 @@ async def _validate_parent(
     dependencies=[_manage_departments],
 )
 async def create_department(
-    payload: DepartmentCreate, session: SessionDep
+    payload: DepartmentCreate, session: SessionDep, current: CurrentUserDep
 ) -> Department:
     await _validate_parent(session, payload.parent_id)
     dept = Department(name=payload.name, parent_id=payload.parent_id)
     session.add(dept)
     await session.flush()
+    await log_audit(
+        session,
+        actor=current,
+        action="create_department",
+        resource_type="department",
+        resource_id=dept.id,
+        after=_snapshot(dept),
+    )
     return dept
 
 
@@ -102,12 +115,16 @@ async def get_department(department_id: str, session: SessionDep) -> Department:
     dependencies=[_manage_departments],
 )
 async def update_department(
-    department_id: str, payload: DepartmentUpdate, session: SessionDep
+    department_id: str,
+    payload: DepartmentUpdate,
+    session: SessionDep,
+    current: CurrentUserDep,
 ) -> Department:
     dept = await session.get(Department, department_id)
     if dept is None:
         raise HTTPException(status_code=404, detail="department not found")
 
+    before = _snapshot(dept)
     if payload.name is not None:
         dept.name = payload.name
     if "parent_id" in payload.model_fields_set:
@@ -115,6 +132,15 @@ async def update_department(
         dept.parent_id = payload.parent_id
 
     await session.flush()
+    await log_audit(
+        session,
+        actor=current,
+        action="update_department",
+        resource_type="department",
+        resource_id=dept.id,
+        before=before,
+        after=_snapshot(dept),
+    )
     return dept
 
 
@@ -123,7 +149,9 @@ async def update_department(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[_manage_departments],
 )
-async def delete_department(department_id: str, session: SessionDep) -> Response:
+async def delete_department(
+    department_id: str, session: SessionDep, current: CurrentUserDep
+) -> Response:
     dept = await session.get(Department, department_id)
     if dept is None:
         raise HTTPException(status_code=404, detail="department not found")
@@ -152,6 +180,15 @@ async def delete_department(department_id: str, session: SessionDep) -> Response
             detail=f"{children} child department(s) still reference this parent",
         )
 
+    before = _snapshot(dept)
     await session.delete(dept)
+    await log_audit(
+        session,
+        actor=current,
+        action="delete_department",
+        resource_type="department",
+        resource_id=department_id,
+        before=before,
+    )
     await session.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

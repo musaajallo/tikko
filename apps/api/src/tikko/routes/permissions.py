@@ -11,7 +11,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import delete, select
 
-from tikko.auth import require_capability
+from tikko.audit import log_audit
+from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.models.role_permission import RolePermission
 from tikko.permissions import ALL_CAPABILITIES, ALL_ROLES, Role
@@ -46,7 +47,9 @@ async def get_permissions(session: SessionDep) -> PermissionsMatrix:
 
 @router.patch("", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_manage_permissions])
 async def patch_permission(
-    payload: PermissionGrantPatch, session: SessionDep
+    payload: PermissionGrantPatch,
+    session: SessionDep,
+    current: CurrentUserDep,
 ) -> None:
     # Guardrail: refuse to revoke the last grant of `manage_permissions` —
     # without at least one role that can edit the matrix, you'd lock yourself
@@ -77,11 +80,28 @@ async def patch_permission(
                 RolePermission(role=payload.role, capability=payload.capability)
             )
             await session.flush()
+            await log_audit(
+                session,
+                actor=current,
+                action="grant_permission",
+                resource_type="role_permission",
+                resource_id=f"{payload.role}:{payload.capability}",
+                after={"role": payload.role, "capability": payload.capability},
+            )
     else:
-        await session.execute(
+        result = await session.execute(
             delete(RolePermission).where(
                 RolePermission.role == payload.role,
                 RolePermission.capability == payload.capability,
             )
         )
         await session.flush()
+        if (result.rowcount or 0) > 0:
+            await log_audit(
+                session,
+                actor=current,
+                action="revoke_permission",
+                resource_type="role_permission",
+                resource_id=f"{payload.role}:{payload.capability}",
+                before={"role": payload.role, "capability": payload.capability},
+            )
