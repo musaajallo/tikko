@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
-from tikko.auth import require_role
+from tikko.auth import require_capability
 from tikko.db import SessionDep
 from tikko.models.device import Device
 from tikko.models.employee import Employee
@@ -34,15 +34,17 @@ from tikko.zk.client import RawTemplate, ZKClient, ZKConnectionError
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
-_admin_only = Depends(require_role("admin"))
-_admin_or_manager = Depends(require_role("admin", "manager"))
+_manage_employees = require_capability("manage_employees")
+_view_employees = require_capability("view_employees")
+_sync_employees = require_capability("sync_employees")
+_manage_employee_templates = require_capability("manage_employee_templates")
 
 
 @router.post(
     "",
     response_model=EmployeeRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[_admin_only],
+    dependencies=[_manage_employees],
 )
 async def create_employee(
     payload: EmployeeCreate, session: SessionDep
@@ -64,7 +66,7 @@ async def create_employee(
     return employee
 
 
-@router.get("", response_model=EmployeeList, dependencies=[_admin_or_manager])
+@router.get("", response_model=EmployeeList, dependencies=[_view_employees])
 async def list_employees(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -88,7 +90,7 @@ async def list_employees(
 @router.get(
     "/{employee_id}",
     response_model=EmployeeRead,
-    dependencies=[_admin_or_manager],
+    dependencies=[_view_employees],
 )
 async def get_employee(employee_id: str, session: SessionDep) -> Employee:
     employee = await session.get(Employee, employee_id)
@@ -98,7 +100,7 @@ async def get_employee(employee_id: str, session: SessionDep) -> Employee:
 
 
 @router.patch(
-    "/{employee_id}", response_model=EmployeeRead, dependencies=[_admin_only]
+    "/{employee_id}", response_model=EmployeeRead, dependencies=[_manage_employees]
 )
 async def update_employee(
     employee_id: str, payload: EmployeeUpdate, session: SessionDep
@@ -129,7 +131,7 @@ async def update_employee(
 @router.delete(
     "/{employee_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[_admin_only],
+    dependencies=[_manage_employees],
 )
 async def delete_employee(employee_id: str, session: SessionDep) -> Response:
     employee = await session.get(Employee, employee_id)
@@ -144,7 +146,7 @@ async def delete_employee(employee_id: str, session: SessionDep) -> Response:
 @router.post(
     "/{employee_id}/sync",
     response_model=EmployeeSyncResult,
-    dependencies=[_admin_only],
+    dependencies=[_sync_employees],
 )
 async def sync_employee(
     employee_id: str,
@@ -198,7 +200,7 @@ async def sync_employee(
 @router.post(
     "/{employee_id}/templates/pull",
     response_model=TemplatePullResult,
-    dependencies=[_admin_only],
+    dependencies=[_manage_employee_templates],
 )
 async def pull_templates(
     employee_id: str,
@@ -257,7 +259,7 @@ async def pull_templates(
 @router.post(
     "/{employee_id}/templates/push",
     response_model=TemplatePushResult,
-    dependencies=[_admin_only],
+    dependencies=[_manage_employee_templates],
 )
 async def push_templates(
     employee_id: str,
@@ -339,7 +341,7 @@ async def push_templates(
 @router.get(
     "/{employee_id}/templates",
     response_model=TemplateList,
-    dependencies=[_admin_or_manager],
+    dependencies=[_view_employees],
 )
 async def list_templates(employee_id: str, session: SessionDep) -> TemplateList:
     employee = await session.get(Employee, employee_id)

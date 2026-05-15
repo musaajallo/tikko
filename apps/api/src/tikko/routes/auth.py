@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from tikko.auth import (
     CurrentUserDep,
+    capabilities_for_role,
     hash_password,
     issue_access_token,
     issue_refresh_token,
@@ -79,9 +80,12 @@ async def get_me(
         if employee is not None:
             employee_payload = EmployeeRead.model_validate(employee)
 
+    capabilities = await capabilities_for_role(session, user.role)
+
     return AuthMeResponse(
         user=UserRead.model_validate(user),
         employee=employee_payload,
+        capabilities=capabilities,
     )
 
 

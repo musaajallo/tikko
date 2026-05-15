@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from tikko.auth import CurrentUserDep, require_role
+from tikko.auth import CurrentUserDep, require_capability
 from tikko.db import SessionDep
 from tikko.models.employee import Employee
 from tikko.models.leave_request import LeaveRequest
@@ -45,10 +45,11 @@ def _serialize_leave(
 
 router = APIRouter(prefix="/leave-requests", tags=["leave-requests"])
 
-_admin_or_manager = Depends(require_role("admin", "manager"))
+_view_team_leave = require_capability("view_team_leave")
+_decide_leave = require_capability("decide_leave")
 
 
-@router.get("", response_model=LeaveRequestList, dependencies=[_admin_or_manager])
+@router.get("", response_model=LeaveRequestList, dependencies=[_view_team_leave])
 async def list_leave_requests(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -84,7 +85,7 @@ async def list_leave_requests(
 @router.patch(
     "/{leave_id}/decision",
     response_model=LeaveRequestRead,
-    dependencies=[_admin_or_manager],
+    dependencies=[_decide_leave],
 )
 async def decide_leave_request(
     leave_id: str,

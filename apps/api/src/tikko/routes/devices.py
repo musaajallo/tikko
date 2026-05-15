@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tikko.auth import get_current_user, require_role
+from tikko.auth import get_current_user, require_capability
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
@@ -22,9 +22,11 @@ from tikko.zk.client import RawPunch, ZKClient, ZKConnectionError
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
-# Common guards reused below.
-_admin_only = Depends(require_role("admin"))
-_admin_or_manager = Depends(require_role("admin", "manager"))
+# Capability-based guards. The (role, capability) matrix in role_permissions
+# decides who passes. See `tikko.permissions.DEFAULT_MATRIX` for the seed.
+_manage_devices = require_capability("manage_devices")
+_view_devices = require_capability("view_devices")
+_poll_devices = require_capability("poll_devices")
 _authenticated = Depends(get_current_user)
 
 
@@ -64,7 +66,7 @@ async def _insert_punches_dedup(
     "",
     response_model=DeviceRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[_admin_only],
+    dependencies=[_manage_devices],
 )
 async def create_device(payload: DeviceCreate, session: SessionDep) -> Device:
     device = Device(
@@ -79,7 +81,7 @@ async def create_device(payload: DeviceCreate, session: SessionDep) -> Device:
     return device
 
 
-@router.get("", response_model=DeviceList, dependencies=[_admin_or_manager])
+@router.get("", response_model=DeviceList, dependencies=[_view_devices])
 async def list_devices(session: SessionDep) -> DeviceList:
     result = await session.execute(select(Device).order_by(Device.created_at))
     items = result.scalars().all()
@@ -91,7 +93,7 @@ async def list_devices(session: SessionDep) -> DeviceList:
 
 
 @router.get(
-    "/{device_id}", response_model=DeviceRead, dependencies=[_admin_or_manager]
+    "/{device_id}", response_model=DeviceRead, dependencies=[_view_devices]
 )
 async def get_device(device_id: str, session: SessionDep) -> Device:
     device = await session.get(Device, device_id)
@@ -103,7 +105,7 @@ async def get_device(device_id: str, session: SessionDep) -> Device:
 @router.post(
     "/{device_id}/test-connection",
     response_model=DeviceInfoRead,
-    dependencies=[_admin_only],
+    dependencies=[_manage_devices],
 )
 async def test_device_connection(device_id: str, session: SessionDep) -> DeviceInfoRead:
     device = await session.get(Device, device_id)
@@ -136,7 +138,7 @@ async def test_device_connection(device_id: str, session: SessionDep) -> DeviceI
 @router.post(
     "/{device_id}/poll",
     response_model=PollResult,
-    dependencies=[_admin_or_manager],
+    dependencies=[_poll_devices],
 )
 async def poll_device(device_id: str, session: SessionDep) -> PollResult:
     device = await session.get(Device, device_id)

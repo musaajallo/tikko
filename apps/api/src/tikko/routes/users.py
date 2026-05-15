@@ -7,20 +7,20 @@ own leave).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from tikko.auth import require_role
+from tikko.auth import require_capability
 from tikko.db import SessionDep
 from tikko.models.user import User
 from tikko.schemas.user import UserList, UserRead, UserRoleUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-_admin_only = Depends(require_role("admin"))
+_manage_users = require_capability("manage_users")
 
 
-@router.get("", response_model=UserList, dependencies=[_admin_only])
+@router.get("", response_model=UserList, dependencies=[_manage_users])
 async def list_users(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -40,7 +40,7 @@ async def list_users(
 
 
 @router.patch(
-    "/{user_id}/role", response_model=UserRead, dependencies=[_admin_only]
+    "/{user_id}/role", response_model=UserRead, dependencies=[_manage_users]
 )
 async def update_user_role(
     user_id: str, payload: UserRoleUpdate, session: SessionDep

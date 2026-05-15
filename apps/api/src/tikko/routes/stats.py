@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from tikko.auth import require_role
+from tikko.auth import require_capability
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.device import Device
@@ -27,7 +27,9 @@ class Stats(BaseModel):
 @router.get(
     "",
     response_model=Stats,
-    dependencies=[Depends(require_role("admin", "manager"))],
+    # Stats is the device-overview KPI strip — gate on view_devices, since it
+    # surfaces device counts more than anything else.
+    dependencies=[require_capability("view_devices")],
 )
 async def get_stats(session: SessionDep) -> Stats:
     now = datetime.now(UTC)

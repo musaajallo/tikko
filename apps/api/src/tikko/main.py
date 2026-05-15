@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from tikko import __version__
-from tikko.db import Base, get_engine
+from tikko.db import Base, get_engine, get_sessionmaker
 from tikko.models import (  # noqa: F401 — register metadata
     AttendanceLog,
     Device,
@@ -28,6 +28,7 @@ from tikko.routes.employees import router as employees_router
 from tikko.routes.iclock import router as iclock_router
 from tikko.routes.leave_requests import router as leave_requests_router
 from tikko.routes.me import router as me_router
+from tikko.routes.permissions import router as permissions_router
 from tikko.routes.reports import router as reports_router
 from tikko.routes.shift_rules import router as shift_rules_router
 from tikko.routes.stats import router as stats_router
@@ -56,6 +57,24 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         engine = get_engine()
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+        # Tests skip migrations, so they also skip the role_permissions seed
+        # that the alembic migration installs. Re-seed here from the in-code
+        # DEFAULT_MATRIX so every test session has a working RBAC table.
+        from sqlalchemy import select as _select
+
+        from tikko.models.role_permission import RolePermission
+        from tikko.permissions import DEFAULT_MATRIX
+
+        async with get_sessionmaker()() as session:
+            existing = await session.scalar(
+                _select(RolePermission).limit(1)
+            )
+            if existing is None:
+                for role, caps in DEFAULT_MATRIX.items():
+                    for cap in caps:
+                        session.add(RolePermission(role=role, capability=cap))
+                await session.commit()
 
     # Skip the background loop in test runs so tests don't poll real devices.
     poller_task: asyncio.Task[None] | None = None
@@ -96,6 +115,7 @@ app.include_router(users_router)
 app.include_router(devices_router)
 app.include_router(employees_router)
 app.include_router(me_router)
+app.include_router(permissions_router)
 app.include_router(leave_requests_router)
 app.include_router(shift_rules_router)
 app.include_router(reports_router)

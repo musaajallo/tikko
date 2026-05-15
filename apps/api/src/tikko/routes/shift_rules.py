@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
-from tikko.auth import require_role
+from tikko.auth import require_capability
 from tikko.db import SessionDep
 from tikko.models.employee import Employee
 from tikko.models.shift_rule import ShiftRule
@@ -18,15 +18,15 @@ from tikko.schemas.shift_rule import (
 
 router = APIRouter(prefix="/shift-rules", tags=["shift-rules"])
 
-_admin_only = Depends(require_role("admin"))
-_admin_or_manager = Depends(require_role("admin", "manager"))
+_manage_shift_rules = require_capability("manage_shift_rules")
+_view_shift_rules = require_capability("view_shift_rules")
 
 
 @router.post(
     "",
     response_model=ShiftRuleRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[_admin_only],
+    dependencies=[_manage_shift_rules],
 )
 async def create_shift_rule(
     payload: ShiftRuleCreate, session: SessionDep
@@ -37,7 +37,7 @@ async def create_shift_rule(
     return rule
 
 
-@router.get("", response_model=ShiftRuleList, dependencies=[_admin_or_manager])
+@router.get("", response_model=ShiftRuleList, dependencies=[_view_shift_rules])
 async def list_shift_rules(
     session: SessionDep,
     page: int = Query(1, ge=1),
@@ -60,7 +60,7 @@ async def list_shift_rules(
 
 
 @router.get(
-    "/{rule_id}", response_model=ShiftRuleRead, dependencies=[_admin_or_manager]
+    "/{rule_id}", response_model=ShiftRuleRead, dependencies=[_view_shift_rules]
 )
 async def get_shift_rule(rule_id: str, session: SessionDep) -> ShiftRule:
     rule = await session.get(ShiftRule, rule_id)
@@ -70,7 +70,7 @@ async def get_shift_rule(rule_id: str, session: SessionDep) -> ShiftRule:
 
 
 @router.patch(
-    "/{rule_id}", response_model=ShiftRuleRead, dependencies=[_admin_only]
+    "/{rule_id}", response_model=ShiftRuleRead, dependencies=[_manage_shift_rules]
 )
 async def update_shift_rule(
     rule_id: str, payload: ShiftRuleUpdate, session: SessionDep
@@ -99,7 +99,7 @@ async def update_shift_rule(
 @router.delete(
     "/{rule_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[_admin_only],
+    dependencies=[_manage_shift_rules],
 )
 async def delete_shift_rule(rule_id: str, session: SessionDep) -> Response:
     rule = await session.get(ShiftRule, rule_id)

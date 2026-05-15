@@ -13,10 +13,10 @@ import csv
 import io
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import select
 
-from tikko.auth import require_role
+from tikko.auth import require_capability
 from tikko.db import SessionDep
 from tikko.models.attendance import AttendanceLog
 from tikko.models.employee import Employee
@@ -31,7 +31,8 @@ from tikko.schemas.report import (
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-_admin_or_manager = Depends(require_role("admin", "manager"))
+_view_reports = require_capability("view_reports")
+_export_reports = require_capability("export_reports")
 
 _MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 
@@ -98,7 +99,7 @@ def _rule_to_spec(rule: ShiftRule) -> ShiftSpec:
 @router.get(
     "/attendance",
     response_model=AttendanceReport,
-    dependencies=[_admin_or_manager],
+    dependencies=[_view_reports],
 )
 async def attendance_report(
     session: SessionDep,
@@ -168,7 +169,7 @@ def _csv_row_for_day(d: object) -> list[str]:
     ]
 
 
-@router.get("/attendance.csv", dependencies=[_admin_or_manager])
+@router.get("/attendance.csv", dependencies=[_export_reports])
 async def attendance_report_csv(
     session: SessionDep,
     employee_id: str = Query(..., description="Employee UUID"),
@@ -207,7 +208,7 @@ async def attendance_report_csv(
 _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
-@router.get("/attendance.xlsx", dependencies=[_admin_or_manager])
+@router.get("/attendance.xlsx", dependencies=[_export_reports])
 async def attendance_report_xlsx(
     session: SessionDep,
     employee_id: str = Query(..., description="Employee UUID"),

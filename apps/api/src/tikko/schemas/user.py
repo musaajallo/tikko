@@ -61,7 +61,14 @@ class TokenResponse(BaseModel):
 
 
 class AuthMeResponse(BaseModel):
-    """`GET /auth/me` returns the current user plus the linked Employee (or null)."""
+    """`GET /auth/me` — current user + linked employee + flat capability list.
+
+    `capabilities` is the union of every (role, capability) row in the
+    `role_permissions` table for this user's role. The frontend uses it to
+    gate navigation + UI affordances without hardcoding role↔capability
+    mappings on the client.
+    """
 
     user: UserRead
     employee: EmployeeRead | None = None
+    capabilities: list[str] = []
