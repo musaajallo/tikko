@@ -62,14 +62,30 @@ def test_post_shift_rule_creates_with_defaults(
     assert isinstance(body["id"], str) and len(body["id"]) == 36
 
 
-def test_post_shift_rule_422_when_start_after_end(
+def test_post_shift_rule_201_for_overnight_shift(
+    client: TestClient, admin_auth: dict[str, str]
+) -> None:
+    """F39: end < start is valid — it means the shift spans midnight."""
+    response = client.post(
+        "/shift-rules",
+        json={
+            "name": "Night",
+            "start_time": "22:00:00",
+            "end_time": "06:00:00",
+        },
+        headers=admin_auth,
+    )
+    assert response.status_code == 201
+
+
+def test_post_shift_rule_422_when_start_equals_end(
     client: TestClient, admin_auth: dict[str, str]
 ) -> None:
     response = client.post(
         "/shift-rules",
         json={
-            "name": "Backwards",
-            "start_time": "17:00:00",
+            "name": "Zero length",
+            "start_time": "09:00:00",
             "end_time": "09:00:00",
         },
         headers=admin_auth,

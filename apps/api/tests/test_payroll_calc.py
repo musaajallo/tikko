@@ -262,3 +262,71 @@ def test_holiday_still_records_overtime_when_present() -> None:
     assert metrics.late_minutes == 0
     assert metrics.early_out_minutes == 0
 
+
+
+# ---------------------------------------------------------------------------
+# F39 — cross-midnight (overnight) shifts.
+# ---------------------------------------------------------------------------
+
+OVERNIGHT_22_TO_6 = ShiftSpec(
+    start_time=time(22, 0),
+    end_time=time(6, 0),
+    late_grace_minutes=0,
+    early_out_grace_minutes=0,
+    overtime_threshold_minutes=30,
+    work_days="1111100",  # Mon-Fri
+)
+
+FRIDAY = date(2026, 5, 15)  # Friday, so Thursday is FRIDAY - 1 (workday).
+
+
+def _at_dt(dt_date: date, h: int, m: int = 0) -> datetime:
+    return datetime(dt_date.year, dt_date.month, dt_date.day, h, m, tzinfo=UTC)
+
+
+def test_overnight_on_time_punches_have_no_late_or_ot() -> None:
+    # Thursday is a workday. Shift starts Thu 22:00, ends Fri 06:00.
+    punches = [_at_dt(THURSDAY, 22, 0), _at_dt(FRIDAY, 6, 0)]
+    metrics = compute_day(OVERNIGHT_22_TO_6, punches, THURSDAY)
+    assert metrics.is_workday is True
+    assert metrics.is_absent is False
+    assert metrics.late_minutes == 0
+    assert metrics.early_out_minutes == 0
+    assert metrics.overtime_minutes == 0
+    # 8 hours from 22:00 -> 06:00.
+    assert metrics.worked_minutes == 8 * 60
+
+
+def test_overnight_late_arrival_counts_against_thursday() -> None:
+    # 15 minutes late at the start; clock out on time the next morning.
+    punches = [_at_dt(THURSDAY, 22, 15), _at_dt(FRIDAY, 6, 0)]
+    metrics = compute_day(OVERNIGHT_22_TO_6, punches, THURSDAY)
+    assert metrics.late_minutes == 15
+    assert metrics.early_out_minutes == 0
+
+
+def test_overnight_overtime_past_morning_threshold() -> None:
+    # Worked past Friday 06:30 by 30 min → OT minutes accumulate past threshold.
+    # Threshold is 30 min, so a 06:45 clock-out is 45 min past end - 30 = 15 min OT.
+    punches = [_at_dt(THURSDAY, 22, 0), _at_dt(FRIDAY, 6, 45)]
+    metrics = compute_day(OVERNIGHT_22_TO_6, punches, THURSDAY)
+    assert metrics.overtime_minutes == 15
+
+
+def test_overnight_friday_with_no_punches_is_workday_absent() -> None:
+    metrics = compute_day(OVERNIGHT_22_TO_6, [], FRIDAY)
+    # Friday-as-on_date with no punches in the Friday-night window is absent.
+    assert metrics.is_workday is True
+    assert metrics.is_absent is True
+
+
+def test_overnight_does_not_double_count_punches_across_days() -> None:
+    # A clock-out Friday 06:00 should attribute to Thursday's shift, not
+    # Friday's shift.
+    punches = [_at_dt(THURSDAY, 22, 0), _at_dt(FRIDAY, 6, 0)]
+    thu = compute_day(OVERNIGHT_22_TO_6, punches, THURSDAY)
+    fri = compute_day(OVERNIGHT_22_TO_6, punches, FRIDAY)
+    assert thu.worked_minutes == 8 * 60
+    # Friday's window starts at Fri 22:00 - 2h = Fri 20:00; nothing in there.
+    assert fri.first_in is None
+    assert fri.is_absent is True

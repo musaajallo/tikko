@@ -109,13 +109,14 @@ async def update_shift_rule(
     for key, value in data.items():
         setattr(rule, key, value)
 
-    # Re-validate start<end on the merged state. The Pydantic Update model
+    # Re-validate start != end on the merged state. The Pydantic Update model
     # can't enforce this cross-field rule by itself because either side can be
-    # absent.
-    if rule.start_time >= rule.end_time:
+    # absent. F39: equality is the only invalid pair — start > end is valid
+    # (overnight shift).
+    if rule.start_time == rule.end_time:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="start_time must be before end_time",
+            detail="start_time and end_time cannot be equal",
         )
 
     await session.flush()

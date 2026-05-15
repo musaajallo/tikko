@@ -21,7 +21,7 @@ from __future__ import annotations
 import calendar
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 
 
 @dataclass(frozen=True)
@@ -78,8 +78,23 @@ def compute_day(
     # is off the hook for the day even if it falls on Mon-Fri.
     counts_as_workday = is_workday and not is_holiday
 
-    # Filter to punches that fall on `on_date` (UTC), then sort.
-    same_day = sorted(p for p in punches if p.date() == on_date)
+    # F39: a shift with end_time < start_time is overnight — it ends on the
+    # next calendar day. The "day of pay" is `on_date` (the day the shift
+    # starts), and we expand the punch window to catch the next-morning
+    # clock-out. Equal start/end is rejected at the schema layer.
+    overnight = spec.end_time < spec.start_time
+
+    if overnight:
+        # Anchor in UTC for the window filter; refine to the punch tz below
+        # once we know we have punches. Punches are UTC by project contract.
+        win_start = datetime.combine(on_date, spec.start_time, tzinfo=UTC) - timedelta(hours=2)
+        win_end = (
+            datetime.combine(on_date + timedelta(days=1), spec.end_time, tzinfo=UTC)
+            + timedelta(hours=6)
+        )
+        same_day = sorted(p for p in punches if win_start <= p <= win_end)
+    else:
+        same_day = sorted(p for p in punches if p.date() == on_date)
 
     if not same_day:
         return DayMetrics(
@@ -103,7 +118,12 @@ def compute_day(
     # arithmetic is meaningful. Punches are UTC by the project's contract.
     tz = first_in.tzinfo
     scheduled_start = datetime.combine(on_date, spec.start_time, tzinfo=tz)
-    scheduled_end = datetime.combine(on_date, spec.end_time, tzinfo=tz)
+    if overnight:
+        scheduled_end = datetime.combine(
+            on_date + timedelta(days=1), spec.end_time, tzinfo=tz
+        )
+    else:
+        scheduled_end = datetime.combine(on_date, spec.end_time, tzinfo=tz)
 
     late_overage = _minutes_between(scheduled_start, first_in) - spec.late_grace_minutes
     late_minutes = max(0, late_overage) if counts_as_workday else 0

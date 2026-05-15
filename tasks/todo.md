@@ -41,9 +41,12 @@ ship before tikko can plausibly be pitched as a BioTime replacement; Tier 2 is
   references a type, approval consumes balance.
 - **F38 Manual punch correction** — `AttendanceLog.source ∈ {device, manual}` +
   `POST /attendance/manual` + audit-logged + UI button on attendance views.
-- **F39 Cross-midnight + multi-segment shifts** — `ShiftRule` supports
-  `end_time < start_time` (overnight) and optional `ShiftSegment` rows for
-  split-shift days; payroll engine updated.
+- **F39 Cross-midnight shifts** — `ShiftRule` supports `end_time < start_time`
+  (overnight); payroll engine attributes overnight punches to the shift's
+  start date.
+- **F39b Multi-segment shifts (deferred)** — `ShiftSegment` rows on a rule for
+  split-shift days (retail / hospitality). Bigger refactor; kept out of F39 to
+  ship cross-midnight without scope creep.
 - **F40 Department / late / early / OT-specific reports** — dept roll-up
   endpoint + dedicated late, early-out, and overtime report variants.
 

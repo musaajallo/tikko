@@ -20,9 +20,11 @@ class ShiftRuleCreate(BaseModel):
     work_days: str = Field("1111100", pattern=_WORK_DAYS_PATTERN)
 
     @model_validator(mode="after")
-    def _start_before_end(self) -> ShiftRuleCreate:
-        if self.start_time >= self.end_time:
-            raise ValueError("start_time must be before end_time")
+    def _start_not_equal_end(self) -> ShiftRuleCreate:
+        # F39: allow start_time > end_time to mean an overnight shift. Only
+        # equality is meaningless (zero-length window) and gets rejected.
+        if self.start_time == self.end_time:
+            raise ValueError("start_time and end_time cannot be equal")
         return self
 
 
